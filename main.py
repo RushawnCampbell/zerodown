@@ -1,7 +1,7 @@
 from tkinter import *
 import customtkinter as gui
 from frontend.Login import Login
-from PIL import Image, ImageTk # For image handling
+from PIL import Image, ImageTk
 
 class App(gui.CTk):
     def __init__(self):
@@ -12,7 +12,7 @@ class App(gui.CTk):
         screen_height = self.winfo_screenheight()
 
         window_width=  400
-        window_height = 400
+        window_height = 200
 
         x = (screen_width - window_width) // 2  # Center horizontally
         y = (screen_height - window_height) // 2  # Center vertically
