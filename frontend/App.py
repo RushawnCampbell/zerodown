@@ -9,19 +9,8 @@ class App(gui.CTk):
         super().__init__()
         self.configure(bg_color="red")
         self.title("ZeroDown: Backup & Restoration Solution")
-    
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
 
-        window_width=  400
-        window_height = 200
-
-        x = (screen_width - window_width) // 2  # Center horizontally
-        y = (screen_height - window_height) // 2  # Center vertically
-
-        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
-
-        self.resizable(width=False, height=False)
+        self.set_window_position(400,200)
 
         try:
             # window icon path
@@ -45,10 +34,18 @@ class App(gui.CTk):
         self.login_view = LoginView(self)
         self.login_view.pack(fill="both", expand=True)
     
+    def set_window_position(self, window_width, window_height):
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - window_width) // 2  # Center horizontally
+        y = (screen_height - window_height) // 2  # Center vertically
+
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.resizable(width=False, height=False)
 
     def show_home_view(self):
         self.title("ZeroDown: Home")
-        self.geometry("800x600")
+        self.set_window_position(800,600)
         self.login_view.pack_forget()  # Hide login view
         self.home_view = HomeView(self)
         self.home_view.pack(fill="both", expand=True)
