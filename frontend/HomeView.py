@@ -9,20 +9,17 @@ class HomeView(gui.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.configure(fg_color="#2B2B2B")
-        """self.grid(row=0, column=0, padx=0, pady=0)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_columnconfigure(2, weight=1)
-        self.grid_columnconfigure(3, weight=1)"""
-
+       
+        self.grid_rowconfigure(0, weight=1) 
+        self.grid_rowconfigure(1, weight=1) 
+        self.grid_rowconfigure(2, weight=2) 
+        self.grid_rowconfigure(3, weight=0) 
 
         self.grid_columnconfigure(0, weight=1)  
 
         self.label_frame = gui.CTkFrame(self)
         self.label_frame.grid(row=0, column=0, padx=40, pady=0, sticky="nsew")
         self.label_frame.configure(fg_color="#2B2B2B")
-       
-
         self.home_label = gui.CTkLabel(self.label_frame, 
                                        text="Welcome User",
                                        font=gui.CTkFont(size=30, weight="bold"),  # Large font
@@ -30,23 +27,28 @@ class HomeView(gui.CTkFrame):
                                        justify="center")  # Center the text
         self.home_label.pack(pady=0, padx=0, fill="x") #fill x to make label expand horizontally
 
+        #Recent Activities Widget
+        self.recent_frame =  gui.CTkScrollableFrame(self, width=630)
+        self.recent_frame.grid(row=1, column=0, padx=40, pady=20) # Add padding
+        self.recent_frame.configure(fg_color="#000000")
 
+        #Button Frame Widget
         self.button_frame = gui.CTkFrame(self)
-        self.button_frame.grid(row=1, column=0, padx=40, pady=20) # Add padding
-        self.button_frame.configure(fg_color="#000000")
+        self.button_frame.grid(row=2, column=0, padx=40, pady=10) # Add padding
+        self.button_frame.configure(fg_color="#202020")
 
+        #Configuring button frame layout for children positioning
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
         self.button_frame.grid_columnconfigure(2, weight=1)
         self.button_frame.grid_columnconfigure(3, weight=1)
 
-
+        #Creating children buttons and adding them to button frame
         image = Image.open("./frontend/assets/icons/computer.png")
         self.ctk_image1 = gui.CTkImage(light_image=image, dark_image=image, size=(50, 50))
         self.button1 = gui.CTkButton(self.button_frame, image=self.ctk_image1,text=" Register \n Endpoint",)
         self.button1.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         
-
         image2 = Image.open("./frontend/assets/icons/database.png")
         self.ctk_image2 = gui.CTkImage(light_image=image2, dark_image=image2, size=(50, 50))
         self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node")
@@ -62,6 +64,11 @@ class HomeView(gui.CTkFrame):
         self.button4 = gui.CTkButton(self.button_frame, image=self.ctk_image4, text="Create \n Backup")
         self.button4.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
+
+        #Creating Toolbar
+        self.tool_bar = gui.CTkFrame(self, height=30)
+        self.tool_bar.grid(row=3, column=0, padx=0, pady=0, sticky="ew")
+        self.tool_bar.configure(fg_color="#202020")
 
 
     """def browse_source(self):
