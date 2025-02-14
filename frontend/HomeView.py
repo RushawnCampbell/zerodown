@@ -10,10 +10,11 @@ class HomeView(gui.CTkFrame):
         super().__init__(master)
         self.configure(fg_color="#2B2B2B")
        
-        self.grid_rowconfigure(0, weight=1) 
+        self.grid_rowconfigure(0, weight=0) 
         self.grid_rowconfigure(1, weight=1) 
-        self.grid_rowconfigure(2, weight=2) 
-        self.grid_rowconfigure(3, weight=0) 
+        self.grid_rowconfigure(2, weight=1) 
+        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=0)  
 
         self.grid_columnconfigure(0, weight=1)  
 
@@ -21,20 +22,20 @@ class HomeView(gui.CTkFrame):
         self.label_frame.grid(row=0, column=0, padx=40, pady=0, sticky="nsew")
         self.label_frame.configure(fg_color="#2B2B2B")
         self.home_label = gui.CTkLabel(self.label_frame, 
-                                       text="Welcome User",
+                                       text="Recent Events",
                                        font=gui.CTkFont(size=30, weight="bold"),  # Large font
                                        wraplength=700,  # Adjust wraplength as needed
                                        justify="center")  # Center the text
-        self.home_label.pack(pady=0, padx=0, fill="x") #fill x to make label expand horizontally
+        self.home_label.pack( pady=(0,0), padx=0, fill="x") #fill x to make label expand horizontally
 
         #Recent Activities Widget
         self.recent_frame =  gui.CTkScrollableFrame(self, width=630)
-        self.recent_frame.grid(row=1, column=0, padx=40, pady=20) # Add padding
+        self.recent_frame.grid(row=1, column=0, padx=40, pady=(0,0)) # Add padding
         self.recent_frame.configure(fg_color="#000000")
 
         #Button Frame Widget
         self.button_frame = gui.CTkFrame(self)
-        self.button_frame.grid(row=2, column=0, padx=40, pady=10) # Add padding
+        self.button_frame.grid(row=2, column=0, padx=40, pady=0) # Add padding
         self.button_frame.configure(fg_color="#202020")
 
         #Configuring button frame layout for children positioning
@@ -66,8 +67,8 @@ class HomeView(gui.CTkFrame):
 
 
         #Creating Toolbar
-        self.tool_bar = gui.CTkFrame(self, height=30)
-        self.tool_bar.grid(row=3, column=0, padx=0, pady=0, sticky="ew")
+        self.tool_bar = gui.CTkFrame(self, height=35)
+        self.tool_bar.grid(row=4, column=0, padx=0, pady=0, sticky="ew")
         self.tool_bar.configure(fg_color="#202020")
 
 
