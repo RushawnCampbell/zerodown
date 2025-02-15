@@ -2,6 +2,8 @@ from tkinter import *
 import customtkinter as gui
 from frontend.LoginView import LoginView
 from frontend.HomeView import HomeView
+from frontend.EndpointRegistration import EndpointRegistration
+from frontend.components.ToolBar import ToolBar
 from PIL import Image, ImageTk
 
 class App(gui.CTk):
@@ -9,7 +11,9 @@ class App(gui.CTk):
         super().__init__()
         self.configure(bg_color="red")
         self.title("ZeroDown: Backup & Restoration Solution")
-
+        self.grid_columnconfigure(0, weight=1) 
+        self.grid_rowconfigure(0, weight=1) 
+        self.grid_rowconfigure(1, weight=0) 
         self.set_window_position(400,200)
 
         try:
@@ -31,8 +35,11 @@ class App(gui.CTk):
         self.home_view = None
         self.backup_view = None  # Initialize to None
         self.restore_view = None
+        self.endpoint_reg_view = None
+        self.tool_bar= ToolBar(self)
         self.login_view = LoginView(self)
-        self.login_view.pack(fill="both", expand=True)
+        
+
     
     def set_window_position(self, window_width, window_height):
         screen_width = self.winfo_screenwidth()
@@ -46,9 +53,16 @@ class App(gui.CTk):
     def show_home_view(self):
         self.title("ZeroDown: Home")
         self.set_window_position(800,600)
-        self.login_view.pack_forget()  # Hide login view
+        self.login_view.grid_forget()  # Hide login view
         self.home_view = HomeView(self)
-        self.home_view.pack(fill="both", expand=True)
+        self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+    def show_endpoint_registration(self):
+        self.title("ZeroDown: Endpoint Registration")
+        #self.set_window_position(800,600)
+        self.home_view.pack_forget()  # Hide login view
+        self.endpoint_reg_view = EndpointRegistration(self)
+        self.endpoint_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
 
     """def show_backup_view(self, user_id):

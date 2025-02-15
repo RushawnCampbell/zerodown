@@ -1,32 +1,30 @@
 import customtkinter as gui
-import tkinter as tk
-from tkinter import filedialog, messagebox
 import os
 import shutil  # For file operations (backup/restore)
-from PIL import Image, ImageTk
+from PIL import Image
 
 class HomeView(gui.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
+
+        self.master=master
         self.configure(fg_color="#2B2B2B")
        
         self.grid_rowconfigure(0, weight=0) 
         self.grid_rowconfigure(1, weight=1) 
         self.grid_rowconfigure(2, weight=1) 
-        self.grid_rowconfigure(3, weight=1)
-        self.grid_rowconfigure(4, weight=0)  
-
+      
         self.grid_columnconfigure(0, weight=1)  
 
-        self.label_frame = gui.CTkFrame(self)
-        self.label_frame.grid(row=0, column=0, padx=40, pady=0, sticky="nsew")
-        self.label_frame.configure(fg_color="#2B2B2B")
-        self.home_label = gui.CTkLabel(self.label_frame, 
+        self.view_title_frame = gui.CTkFrame(self)
+        self.view_title_frame.grid(row=0, column=0, padx=40, pady=0, sticky="nsew")
+        self.view_title_frame.configure(fg_color="#2B2B2B")
+        self.view_title = gui.CTkLabel(self.view_title_frame, 
                                        text="Recent Events",
-                                       font=gui.CTkFont(size=30, weight="bold"),  # Large font
+                                       font=gui.CTkFont(size=20, weight="bold"),  # Large font
                                        wraplength=700,  # Adjust wraplength as needed
                                        justify="center")  # Center the text
-        self.home_label.pack( pady=(0,0), padx=0, fill="x") #fill x to make label expand horizontally
+        self.view_title.pack( pady=(0,0), padx=0, fill="x") #fill x to make label expand horizontally
 
         #Recent Activities Widget
         self.recent_frame =  gui.CTkScrollableFrame(self, width=630)
@@ -47,7 +45,7 @@ class HomeView(gui.CTkFrame):
         #Creating children buttons and adding them to button frame
         image = Image.open("./frontend/assets/icons/computer.png")
         self.ctk_image1 = gui.CTkImage(light_image=image, dark_image=image, size=(50, 50))
-        self.button1 = gui.CTkButton(self.button_frame, image=self.ctk_image1,text=" Register \n Endpoint",)
+        self.button1 = gui.CTkButton(self.button_frame, image=self.ctk_image1,text=" Register \n Endpoint", command=self.master.show_endpoint_registration)
         self.button1.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         
         image2 = Image.open("./frontend/assets/icons/database.png")
@@ -64,12 +62,6 @@ class HomeView(gui.CTkFrame):
         self.ctk_image4 = gui.CTkImage(light_image=image4, dark_image=image4, size=(50, 50))
         self.button4 = gui.CTkButton(self.button_frame, image=self.ctk_image4, text="Create \n Backup")
         self.button4.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
-
-
-        #Creating Toolbar
-        self.tool_bar = gui.CTkFrame(self, height=35)
-        self.tool_bar.grid(row=4, column=0, padx=0, pady=0, sticky="ew")
-        self.tool_bar.configure(fg_color="#202020")
 
 
     """def browse_source(self):

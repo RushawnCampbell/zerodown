@@ -8,6 +8,8 @@ class LoginView(gui.CTkFrame):
 
         self.master = master
 
+        self.grid(row=0, column=0, padx=0, pady=0, sticky='nsew')
+
         self.username_label = gui.CTkLabel(self, text="Username:")
         self.username_label.pack(pady=(5, 0), padx=(0,130))
         self.username_entry = gui.CTkEntry(self, width=200)
@@ -37,6 +39,7 @@ class LoginView(gui.CTkFrame):
                 print("Successful login")
                 self.master.show_home_view() 
                 self.pack_forget() # Hide this view
+                self.master.tool_bar.configure(height=35)
             else:
                 print("Invalid username or password")
 
