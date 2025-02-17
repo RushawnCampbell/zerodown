@@ -39,6 +39,7 @@ class LoginView(gui.CTkFrame):
                 print("Successful login")
                 self.master.show_home_view() 
                 self.pack_forget() # Hide this view
+                self.master.tool_bar.grid(row=1, column=0, padx=0, pady=0, sticky="ew")
                 self.master.tool_bar.configure(height=35)
             else:
                 print("Invalid username or password")

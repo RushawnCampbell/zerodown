@@ -37,6 +37,7 @@ class App(gui.CTk):
         self.restore_view = None
         self.endpoint_reg_view = None
         self.tool_bar= ToolBar(self)
+        self.tool_bar.grid_forget()
         self.login_view = LoginView(self)
         
 
@@ -50,12 +51,18 @@ class App(gui.CTk):
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(width=False, height=False)
 
+    def route_home(self):
+        body_widget = self.grid_slaves(row=0)
+        if body_widget:
+            widget_to_remove = body_widget[0] 
+            widget_to_remove.grid_forget()
+            self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
     def show_home_view(self):
         self.title("ZeroDown: Home")
         self.set_window_position(800,600)
         self.login_view.grid_forget()  # Hide login view
         self.home_view = HomeView(self)
-        self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def show_endpoint_registration(self):
         self.title("ZeroDown: Endpoint Registration")

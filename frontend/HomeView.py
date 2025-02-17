@@ -9,6 +9,7 @@ class HomeView(gui.CTkFrame):
 
         self.master=master
         self.configure(fg_color="#2B2B2B")
+        self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
        
         self.grid_rowconfigure(0, weight=0) 
         self.grid_rowconfigure(1, weight=1) 
