@@ -57,6 +57,7 @@ class App(gui.CTk):
             widget_to_remove = body_widget[0] 
             widget_to_remove.grid_forget()
             self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+            self.title("ZeroDown: Home")
 
     def show_home_view(self):
         self.title("ZeroDown: Home")
