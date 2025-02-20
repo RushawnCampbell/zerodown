@@ -1,34 +1,60 @@
-import customtkinter as ctk
-import requests
+import winshell
+import os
+import servicemanager
+import win32serviceutil
+import win32service
 
-class LoginScreen(ctk.CTkFrame):
-    def __init__(self, master, switch_to_main):  # Add switch function
-        super().__init__(master)
-        self.master = master
-        self.switch_to_main = switch_to_main # Store the callback
-        # ... (Login screen widgets)
-        self.login_button = ctk.CTkButton(self, text="Login", command=self.login)
-        self.login_button.pack()
-        self.error_label = ctk.CTkLabel(self, text="", text_color="red")
-        self.error_label.pack()
+class MyService(win32serviceutil.ServiceFramework):
+    _svc_name_ = "MyStartupService"  # Service name
+    _svc_display_name_ = "My Startup Service"  # Service display name
+    _svc_description_ = "This service runs my_program.exe at startup." # Service description
 
+    def __init__(self, args):
+        win32serviceutil.ServiceFramework.__init__(self, args)
+        self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
+        self.is_running = True
+        self.exe_path = r"C:\path\to\your\my_program.exe"  # Path to your .exe
+        self.log_file = r"C:\path\to\your\log_file.txt" # Path to log file
 
-    def login(self):
-        username = self.username_entry.get()  # Get username from entry
-        password = self.password_entry.get()  # Get password
-        data = {'username': username, 'password': password}
-
+    def SvcDoRun(self):
+        self.log("Service started.")
         try:
-            response = requests.post('http://127.0.0.1:5000/api/login', json=data) # Flask server address
+            # Check if the .exe exists
+            if not os.path.exists(self.exe_path):
+                self.log(f"Error: Executable not found at {self.exe_path}")
+                self.SvcStop()  # Stop the service if the executable is missing
+                return
 
-            if response.status_code == 200:
-                self.switch_to_main(username) # Call the switch function upon successful login
-            else:
-                error_message = response.json().get('message', 'Login failed') # Extract error message
-                self.error_label.configure(text=error_message) # Display error
+            # Run the executable
+            self.log(f"Running: {self.exe_path}")
+            os.startfile(self.exe_path)  # Or subprocess.Popen for more control
 
-        except requests.exceptions.RequestException as e:
-            self.error_label.configure(text=f"Connection error: {e}")
+            while self.is_running: #keep the service running to prevent it from stopping
+                time.sleep(1) #sleep for 1 sec
+        except Exception as e:
+            self.log(f"Error running executable: {e}")
+            self.SvcStop()
 
-# ... similar structure for backup_screen.py and restore_screen.py
-# You can use requests to interact with the Flask API endpoints.
+    def SvcStop(self):
+        self.log("Service stopping.")
+        self.is_running = False
+        win32event.SetEvent(self.hWaitStop)
+        self.log("Service stopped.")
+
+    def log(self, message):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self.log_file, "a") as f:
+            f.write(f"{timestamp}: {message}\n")
+
+
+if __name__ == '__main__':
+    import win32event
+    import time
+    import datetime
+
+    # Handle service installation/removal
+    if len(sys.argv) == 1:
+        servicemanager.Initialize()
+        servicemanager.StartServiceCtrlDispatcher([MyService._svc_name_, MyService])
+    else:
+        win32serviceutil.HandleCommandLine(MyService)
