@@ -12,13 +12,17 @@ class LoginView(gui.CTkFrame):
 
         self.username_label = gui.CTkLabel(self, text="Username:")
         self.username_label.pack(pady=(5, 0), padx=(0,130))
-        self.username_entry = gui.CTkEntry(self, width=200)
+        self.username_entry = gui.CTkEntry(self, width=200, text_color="#000000", border_width=0)
         self.username_entry.pack(pady=(0, 5))
+        self.username_entry.configure(fg_color="#FFFFFF")
+        self.username_entry.configure(bg_color="#FFFFFF")
 
         self.password_label = gui.CTkLabel(self, text="Password:")
         self.password_label.pack(pady=(0, 0), padx=(0,130))
-        self.password_entry = gui.CTkEntry(self, show="*", width=200)
+        self.password_entry = gui.CTkEntry(self, show="*", width=200, text_color="#000000", border_width=0)
         self.password_entry.pack(pady=(0, 20))
+        self.password_entry.configure(fg_color="#FFFFFF")
+        self.password_entry.configure(bg_color="#FFFFFF")
 
         self.login_button = gui.CTkButton(self, text="Login", command=self.login)
         self.login_button.pack()

@@ -1,6 +1,4 @@
 import customtkinter as gui
-import os
-import shutil  # For file operations (backup/restore)
 from PIL import Image
 
 class HomeView(gui.CTkFrame):
@@ -51,7 +49,7 @@ class HomeView(gui.CTkFrame):
         
         image2 = Image.open("./frontend/assets/icons/database.png")
         self.ctk_image2 = gui.CTkImage(light_image=image2, dark_image=image2, size=(50, 50))
-        self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node")
+        self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node", command=self.master.show_storage_registration)
         self.button2.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         image3 = Image.open("./frontend/assets/icons/recover.png")

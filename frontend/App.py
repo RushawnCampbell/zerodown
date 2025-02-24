@@ -3,6 +3,7 @@ import customtkinter as gui
 from frontend.LoginView import LoginView
 from frontend.HomeView import HomeView
 from frontend.EndpointRegistration import EndpointRegistration
+from frontend.StorageRegistration import StorageRegistration
 from frontend.components.ToolBar import ToolBar
 from PIL import Image, ImageTk
 
@@ -71,6 +72,13 @@ class App(gui.CTk):
         self.home_view.pack_forget()  # Hide login view
         self.endpoint_reg_view = EndpointRegistration(self)
         self.endpoint_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+    def show_storage_registration(self):
+        self.title("ZeroDown: Storage Node Registration")
+        #self.set_window_position(800,600)
+        self.home_view.pack_forget()  # Hide login view
+        self.storage_reg_view = StorageRegistration(self)
+        self.storage_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
 
     """def show_backup_view(self, user_id):
