@@ -53,6 +53,27 @@ class Zeroapi:
                 return jsonify({
                     "message": "Log out successful"
                 }),200
+            
+
+    @app.route('/zeroapi/v1/download/<download_type>', methods=['GET'])
+    @login_required
+    def download(download_type):
+        try:
+            filename = f'{download_type}.exe'
+            file_path = os.path.join("dist", filename) 
+            if not os.path.exists(file_path):
+                return jsonify({
+                    "message": "The requested resource could not be found. Contact the ZeroDown Support for help.",
+                }),404
+            return send_file(
+                file_path,
+                as_attachment=True,
+                download_name=filename  # Sets the filename in the user's download
+            )
+        except FileNotFoundError:
+            return "File not found", 404
+        except Exception as e:
+            return f"An error occurred: {e}", 500
 
     @login_manager.user_loader
     def load_user(id):

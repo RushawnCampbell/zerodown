@@ -1,4 +1,5 @@
 from tkinter import *
+import os, platform
 import customtkinter as gui
 from frontend.LoginView import LoginView
 from frontend.HomeView import HomeView
@@ -17,21 +18,7 @@ class App(gui.CTk):
         self.grid_rowconfigure(1, weight=0) 
         self.set_window_position(400,200)
 
-        try:
-            # window icon path
-            icon_image = Image.open("./frontend/assets/icons/zerodown.png") # Use a .png file!
-            icon_photo = ImageTk.PhotoImage(icon_image)
-
-            # Setting the icon for the Tk window (root)
-            self.wm_iconphoto(True, icon_photo)  # For Tkinter
-        
-            self.iconbitmap("./frontend/assets/icons/zerodown.ico") # For .ico files (Windows only)
-            
-            #self.iconbitmap(default="path/to/your/icon.xbm") # For .xbm files (Linux)
-
-        except Exception as e:
-            print(f"Error setting icon: {e}")  # Handle potential errors
-
+        self.set_icon()
 
         self.home_view = None
         self.backup_view = None  # Initialize to None
@@ -40,8 +27,23 @@ class App(gui.CTk):
         self.tool_bar= ToolBar(self)
         self.tool_bar.grid_forget()
         self.login_view = LoginView(self)
-        
 
+    def set_icon(self):
+        try:
+            icon_path_png = os.path.join("frontend", "assets", "icons", "zerodown.png")
+            icon_path_ico = os.path.join("frontend", "assets", "icons", "zerodown.ico")
+
+            if os.path.exists(icon_path_png):
+                icon_image = Image.open(icon_path_png)
+                icon_photo = ImageTk.PhotoImage(icon_image)
+                self.wm_iconphoto(True, icon_photo)
+
+            if platform.system() == "Windows" and os.path.exists(icon_path_ico):
+                self.iconbitmap(icon_path_ico)
+
+        except Exception as e:
+            print(f"Error setting icon: {e}")
+    
     
     def set_window_position(self, window_width, window_height):
         screen_width = self.winfo_screenwidth()

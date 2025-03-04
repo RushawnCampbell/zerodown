@@ -1,4 +1,5 @@
 import customtkinter as gui
+from frontend.components.Popup import Popup
 from PIL import Image
 
 class EndpointRegistration(gui.CTkFrame):
@@ -51,7 +52,7 @@ class EndpointRegistration(gui.CTkFrame):
         self.step2_label = gui.CTkLabel(self.form_body, text="STEP 2: DOWNLOAD ENDPOINT INSTALLER",font=gui.CTkFont(size=15, weight="bold"), anchor="w")
         self.download_image = Image.open("./frontend/assets/icons/download.png")
         self.ctk_download_image = gui.CTkImage(light_image=self.download_image, dark_image=self.download_image, size=(25, 25))
-        self.step2_button = gui.CTkButton(self.form_body,image=self.ctk_download_image, text="Download Endpoint Installer")
+        self.step2_button = gui.CTkButton(self.form_body,image=self.ctk_download_image, text="Download Endpoint Installer", command=self.download_installer)
 
         self.step3_label = gui.CTkLabel(self.form_body, text="STEP 3: TEST CONNECTION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
         self.test_image = Image.open("./frontend/assets/icons/Test.png")
@@ -86,3 +87,6 @@ class EndpointRegistration(gui.CTkFrame):
 
         self.step4_label.grid(row=6, column=0, padx=20, pady=(10, 0), sticky="ew")
         self.step4_button.grid(row=7, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+    def download_installer(self):
+        download_pup = Popup(self, "Downloading Endpoint Installer")
