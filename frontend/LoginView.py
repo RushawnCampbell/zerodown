@@ -1,4 +1,5 @@
 import customtkinter as gui
+import tkinter as tkint
 import requests, json
 
 class LoginView(gui.CTkFrame):
@@ -36,21 +37,16 @@ class LoginView(gui.CTkFrame):
             statcode = response.status_code
             errorcode = response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
             data = response.json()
-            #print("STATUS IS", type(statcode))
-            #print("ERROR IS", errorcode)
-            #print("DATA IS", data)
+            zauth_token = data["zauth_token"]
+            self.master.store_auth_token(zauth_token=zauth_token)
+         
             if statcode == 200:
-                print("Successful login")
                 self.master.show_home_view() 
                 self.pack_forget() # Hide this view
                 self.master.tool_bar.grid(row=1, column=0, padx=0, pady=0, sticky="ew")
                 self.master.tool_bar.configure(height=35)
             else:
-                print("Invalid username or password")
+                tkint.messagebox.showerror("Something Went Wrong", "Check your username and password then try again.")
 
         except requests.exceptions.RequestException as e:
-            print("API request failed")
-            print("ERROR IS ", e)
-        except json.JSONDecodeError as e:
-            print("INVALID JSON")
-            print("ERROR IS ", e)
+            tkint.messagebox.showerror("Something Went Wrong", "Check your username and password then try again.")

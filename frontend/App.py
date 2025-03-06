@@ -1,5 +1,6 @@
 from tkinter import *
-import os, platform
+import tkinter as tkint
+import os, platform, keyring, getpass
 import customtkinter as gui
 from frontend.LoginView import LoginView
 from frontend.HomeView import HomeView
@@ -11,6 +12,8 @@ from PIL import Image, ImageTk
 class App(gui.CTk):
     def __init__(self):
         super().__init__()
+        self.app_name="ZeroDown"
+        self.windows_user= self.get_windows_username()
         self.configure(bg_color="red")
         self.title("ZeroDown: Backup & Restoration Solution")
         self.grid_columnconfigure(0, weight=1) 
@@ -81,6 +84,57 @@ class App(gui.CTk):
         self.home_view.pack_forget()  # Hide login view
         self.storage_reg_view = StorageRegistration(self)
         self.storage_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+
+    def get_windows_username(self):
+        try:
+            username = os.getlogin()
+            return username
+        except OSError:
+            try:
+                username = getpass.getuser()
+                return username
+            except Exception as e:
+                print(f"Error getting username: {e}")
+                return None
+
+    def store_auth_token(self, zauth_token):
+        try:
+            service_name = self.app_name
+            username = self.windows_user
+            keyring.set_password(service_name, username, zauth_token)
+        except Exception as e:
+            err_msg = str(e)
+            tkint.messagebox.showerror("Token Storage Failed", f"Error storing token: {err_msg}")
+
+    def retrieve_auth_token(self):
+        try:
+            service_name = self.app_name
+            username = self.windows_user
+            token = keyring.get_password(service_name, username)
+            if token:
+                return token
+            else:
+                tkint.messagebox.showerror("Token Retrieval Failed", "Token not found.")
+                return None  
+        except Exception as e:
+            err_msg = str(e)
+            tkint.messagebox.showerror("Token Retrieval Failed", f"Error retrieving token: {err_msg}")
+            return None  
+        
+    def delete_auth_token(self):
+        try:
+            service_name = self.app_name
+            username = self.windows_user
+            if username:
+                keyring.delete_password(service_name, username)
+            else:
+                tkint.messagebox.showerror("Token Deletion Failed", "Could not determine username.")
+        except keyring.errors.PasswordDeleteError: #Added specific error handling
+            tkint.messagebox.showerror("Token Deletion Failed", "Token not found.")
+        except Exception as e:
+            err_msg = str(e)
+            tkint.messagebox.showerror("Token Deletion Failed", f"Error deleting token: {err_msg}")
 
 
     """def show_backup_view(self, user_id):

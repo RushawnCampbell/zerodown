@@ -1,6 +1,5 @@
 import customtkinter as gui
 from PIL import Image, ImageTk
-
 import os, platform, tkinter
 
 class Popup(gui.CTkToplevel):
@@ -8,11 +7,10 @@ class Popup(gui.CTkToplevel):
         super().__init__(master)
         self.after(500, self.set_icon)
         self.title(title)
-        self.set_window_position(400,300)
+        self.set_window_position(430,300) # increased height to accommodate button
         self.transient(master)
         master.master.attributes("-alpha", 0.3) 
         self.configure(fg_color="#FFFFFF")
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
 
     def set_window_position(self, window_width, window_height):
@@ -38,8 +36,30 @@ class Popup(gui.CTkToplevel):
                 self.iconbitmap(icon_path_ico)
 
         except Exception as e:
-            print(f"Error setting icon: {e}")   
+            print(f"Error setting icon: {e}") 
 
     def on_close(self):
         self.master.master.attributes("-alpha", 1) 
         self.destroy()
+
+    def disable_close(self):
+        pass
+
+
+    def display_gif(self,label, gif_path, width, height, delay=40):
+        gif = Image.open(gif_path)
+        frames = []
+
+        for i in range(gif.n_frames):
+            gif.seek(i)
+            frame = gif.copy().convert('RGBA')
+            resized_frame = frame.resize((width, height), Image.LANCZOS)
+            ctk_image = gui.CTkImage(light_image=resized_frame, dark_image=resized_frame, size=(width, height)) # use resized_frame
+            frames.append(ctk_image)
+
+        def update_frame(index):
+            label.configure(image=frames[index])
+            label.image = frames[index]
+            self.after(delay, update_frame, (index + 1) % len(frames))
+
+        update_frame(0)

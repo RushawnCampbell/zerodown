@@ -1,5 +1,5 @@
 import customtkinter as gui
-from frontend.components.Popup import Popup
+from frontend.components.EndpointDownloader import EndpointDownloader
 from PIL import Image
 
 class EndpointRegistration(gui.CTkFrame):
@@ -58,12 +58,13 @@ class EndpointRegistration(gui.CTkFrame):
         self.test_image = Image.open("./frontend/assets/icons/Test.png")
         self.ctk_test_image = gui.CTkImage(light_image=self.test_image, dark_image=self.test_image, size=(25, 25))
         self.step3_button = gui.CTkButton(self.form_body,image=self.ctk_test_image, text="Test Connection (Not Yet Tested)")
+        self.step3_button.configure(state="disabled", fg_color="#2b2b2b")
 
         self.step4_label = gui.CTkLabel(self.form_body, text="STEP 4: COMPLETE REGISTRATION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
         self.complete_reg_image = Image.open("./frontend/assets/icons/check-list.png")
         self.ctk_complete_reg_image = gui.CTkImage(light_image=self.complete_reg_image, dark_image=self.complete_reg_image, size=(25, 25))
         self.step4_button = gui.CTkButton(self.form_body, image=self.ctk_complete_reg_image, text="Complete Registration")
-        self.step4_button.configure(fg_color="#1fa59d")
+        self.step4_button.configure(state="disabled", fg_color="#2b2b2b") # #1fa59d
 
     def _layout_widgets(self):
         """Arranges the widgets within the grid layout."""
@@ -89,4 +90,4 @@ class EndpointRegistration(gui.CTkFrame):
         self.step4_button.grid(row=7, column=0, padx=20, pady=(0, 10), sticky="ew")
 
     def download_installer(self):
-        download_pup = Popup(self, "Downloading Endpoint Installer")
+        download_pup = EndpointDownloader(self, "Downloading Endpoint Installer")
