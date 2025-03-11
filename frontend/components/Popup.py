@@ -9,9 +9,14 @@ class Popup(gui.CTkToplevel):
         self.title(title)
         self.set_window_position(430,300) # increased height to accommodate button
         self.transient(master)
-        master.master.attributes("-alpha", 0.3) 
+        self.fade_app()
         self.configure(fg_color="#FFFFFF")
 
+    def fade_app(self):
+        self.master.master.attributes("-alpha", 0.3) 
+    
+    def unfade_app(self):
+        self.master.master.attributes("-alpha", 1) 
 
     def set_window_position(self, window_width, window_height):
         screen_width = self.winfo_screenwidth()
@@ -39,7 +44,7 @@ class Popup(gui.CTkToplevel):
             print(f"Error setting icon: {e}") 
 
     def on_close(self):
-        self.master.master.attributes("-alpha", 1) 
+        self.unfade_app()
         self.destroy()
 
     def disable_close(self):

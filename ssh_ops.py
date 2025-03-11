@@ -9,7 +9,8 @@ def get_windows_volumes(hostname, username, port=22, key_filename=None):
     try:
         client = paramiko.SSHClient()
         client.load_system_host_keys()
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        #client.set_missing_host_key_policy(paramiko.RejectPolicy())    will be used for subsequent connection
 
        
         logging.info(f"Using key file: {key_filename}")
@@ -54,9 +55,9 @@ def get_windows_volumes(hostname, username, port=22, key_filename=None):
             client.close()
 
 if __name__ == "__main__":
-    hostname = "18.220.242.40"  
+    hostname = "3.144.219.127"  
     username = "Administrator"  
-    key_filename = os.path.expanduser("~/.ssh/id_rsa") 
+    key_filename = os.path.join(os.path.expanduser("~"), ".ssh", "id_rsa")
 
     volumes = get_windows_volumes(hostname, username, key_filename=key_filename)
 

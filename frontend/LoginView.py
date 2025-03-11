@@ -35,7 +35,7 @@ class LoginView(gui.CTkFrame):
         try:
             response = requests.post("http://127.0.0.1:8080/zeroapi/v1/login", json={"username": username, "password": password})
             statcode = response.status_code
-            errorcode = response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+            errorcode = response.raise_for_status()  
             data = response.json()
             zauth_token = data["zauth_token"]
             self.master.store_auth_token(zauth_token=zauth_token)

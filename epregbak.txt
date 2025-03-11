@@ -1,0 +1,466 @@
+import customtkinter as gui
+from frontend.components.EndpointDownloader import EndpointDownloader
+from PIL import Image
+
+class EndpointRegistration(gui.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.master = master
+        self.step2_button = None
+        self.step3_button = None
+        self.ctk_completed_image = None
+        self.completed_image = None
+        self._configure_ui()
+        self._create_widgets()
+        self._layout_widgets()
+
+    def _configure_ui(self):
+        """Configures the UI appearance and grid layout."""
+        self.configure(fg_color="#2B2B2B")
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+    def _create_widgets(self):
+        """Creates and initializes all UI widgets."""
+        self.view_title_frame = gui.CTkFrame(self)
+        self.view_title = gui.CTkLabel(
+            self.view_title_frame,
+            text="Register Endpoint",
+            font=gui.CTkFont(size=20, weight="bold"),
+            wraplength=700,
+            justify="center",
+        )
+
+        self.form_body = gui.CTkFrame(self)
+        self.form_body.configure(fg_color="#000000")
+        self.form_body.grid_columnconfigure(0, weight=1)
+        for i in range(4):
+            self.form_body.grid_rowconfigure(i * 2, weight=1)
+            self.form_body.grid_rowconfigure(i * 2 + 1, weight=1)
+
+        self.step1_label = gui.CTkLabel(self.form_body, text="STEP 1: DEFINE ENDPOINT", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.step1_entry_frame = gui.CTkFrame(self.form_body)
+        self.step1_entry_frame.grid_columnconfigure(1, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.grid_columnconfigure(3, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.configure(fg_color="#000000")
+
+        self.step1_label1 = gui.CTkLabel(self.step1_entry_frame, text="Name", anchor="w")
+        self.step1_entry1 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry1.configure(fg_color="#FFFFFF")
+        self.step1_label2 = gui.CTkLabel(self.step1_entry_frame, text="IP Address", anchor="w")
+        self.step1_entry2 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry2.configure(fg_color="#FFFFFF")
+
+        self.step2_label = gui.CTkLabel(self.form_body, text="STEP 2: DOWNLOAD ENDPOINT INSTALLER",font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.download_image = Image.open("./frontend/assets/icons/download.png")
+        self.ctk_download_image = gui.CTkImage(light_image=self.download_image, dark_image=self.download_image, size=(25, 25))
+        self.step2_button = gui.CTkButton(self.form_body,image=self.ctk_download_image, text="Download Endpoint Installer", command=self.download_installer)
+
+        self.step3_label = gui.CTkLabel(self.form_body, text="STEP 3: TEST CONNECTION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.test_image = Image.open("./frontend/assets/icons/Test.png")
+        self.ctk_test_image = gui.CTkImage(light_image=self.test_image, dark_image=self.test_image, size=(25, 25))
+        self.step3_button = gui.CTkButton(self.form_body,image=self.ctk_test_image, text="Test Connection (Not Yet Tested)")
+        self.step3_button.configure(state="disabled", fg_color="#2b2b2b")
+
+        self.step4_label = gui.CTkLabel(self.form_body, text="STEP 4: COMPLETE REGISTRATION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.complete_reg_image = Image.open("./frontend/assets/icons/check-list.png")
+        self.ctk_complete_reg_image = gui.CTkImage(light_image=self.complete_reg_image, dark_image=self.complete_reg_image, size=(25, 25))
+        self.step4_button = gui.CTkButton(self.form_body, image=self.ctk_complete_reg_image, text="Complete Registration")
+        self.step4_button.configure(state="disabled", fg_color="#2b2b2b") # #1fa59d
+
+    def _layout_widgets(self):
+        """Arranges the widgets within the grid layout."""
+        self.view_title_frame.grid(row=0, column=0, padx=40, pady=20, sticky="nsew")
+        self.view_title.pack(pady=(0, 0), padx=0, fill="x")
+
+        self.form_body.grid(row=1, column=0, padx=100, pady=(0, 20), sticky="nsew")
+
+        self.step1_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step1_entry_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+        self.step1_label1.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        self.step1_entry1.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.step1_label2.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
+        self.step1_entry2.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+
+        self.step2_label.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step2_button.grid(row=3, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self.step3_label.grid(row=4, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step3_button.grid(row=5, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self.step4_label.grid(row=6, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step4_button.grid(row=7, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+    def download_installer(self):
+        download_pup = EndpointDownloader(self, "Downloading Endpoint Installer")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import customtkinter as gui
+from frontend.components.EndpointDownloader import EndpointDownloader
+from PIL import Image
+
+class EndpointRegistration(gui.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.master = master
+        self.step2_button = None
+        self.step3_button = None
+        self.ctk_completed_image = None
+        self.completed_image = None
+        self._configure_ui()
+        self._create_widgets()
+        self._layout_widgets()
+
+    def _configure_ui(self):
+        """Configures the UI appearance and grid layout."""
+        self.configure(fg_color="#2B2B2B")
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+    def _create_widgets(self):
+        """Creates and initializes all UI widgets."""
+        self.view_title_frame = gui.CTkFrame(self)
+        self.view_title = gui.CTkLabel(
+            self.view_title_frame,
+            text="Register Endpoint",
+            font=gui.CTkFont(size=20, weight="bold"),
+            wraplength=700,
+            justify="center",
+        )
+
+        self.form_body = gui.CTkFrame(self)
+        self.form_body.configure(fg_color="#000000")
+        self.form_body.grid_columnconfigure(0, weight=1)
+        for i in range(4):
+            self.form_body.grid_rowconfigure(i * 2, weight=1)
+            self.form_body.grid_rowconfigure(i * 2 + 1, weight=1)
+
+        self.step1_label = gui.CTkLabel(self.form_body, text="STEP 1: DEFINE ENDPOINT", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.step1_entry_frame = gui.CTkFrame(self.form_body)
+        self.step1_entry_frame.grid_columnconfigure(1, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.grid_columnconfigure(3, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.grid_columnconfigure(5, weight=2)
+        self.step1_entry_frame.configure(fg_color="#000000")
+
+        self.step1_label1 = gui.CTkLabel(self.step1_entry_frame, text="Name", anchor="w")
+        self.step1_entry1 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry1.configure(fg_color="#FFFFFF")
+        self.step1_label2 = gui.CTkLabel(self.step1_entry_frame, text="IP Address", anchor="w")
+        self.step1_entry2 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry2.configure(fg_color="#FFFFFF")
+        self.step1_label3 = gui.CTkLabel(self.step1_entry_frame, text="SSH Username", anchor="w")
+        self.step1_entry3 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry3.configure(fg_color="#FFFFFF")
+
+        self.step2_label = gui.CTkLabel(self.form_body, text="STEP 2: DOWNLOAD ENDPOINT INSTALLER",font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.download_image = Image.open("./frontend/assets/icons/download.png")
+        self.ctk_download_image = gui.CTkImage(light_image=self.download_image, dark_image=self.download_image, size=(25, 25))
+        self.step2_button = gui.CTkButton(self.form_body,image=self.ctk_download_image, text="Download Endpoint Installer", command=self.download_installer)
+
+        self.step3_label = gui.CTkLabel(self.form_body, text="STEP 3: TEST CONNECTION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.test_image = Image.open("./frontend/assets/icons/Test.png")
+        self.ctk_test_image = gui.CTkImage(light_image=self.test_image, dark_image=self.test_image, size=(25, 25))
+        self.step3_button = gui.CTkButton(self.form_body,image=self.ctk_test_image, text="Test Connection (Not Yet Tested)")
+        self.step3_button.configure(state="disabled", fg_color="#2b2b2b")
+
+        self.complete_reg_image = Image.open("./frontend/assets/icons/check-list.png")
+        self.ctk_complete_reg_image = gui.CTkImage(light_image=self.complete_reg_image, dark_image=self.complete_reg_image, size=(25, 25))
+        self.step4_button = gui.CTkButton(self.form_body, image=self.ctk_complete_reg_image, text="Complete Registration")
+        self.step4_button.configure(state="disabled", fg_color="#2b2b2b") # #1fa59d
+
+    def _layout_widgets(self):
+        """Arranges the widgets within the grid layout."""
+        self.view_title_frame.grid(row=0, column=0, padx=40, pady=20, sticky="nsew")
+        self.view_title.pack(pady=(0, 0), padx=0, fill="x")
+
+        self.form_body.grid(row=1, column=0, padx=100, pady=(0, 20), sticky="nsew")
+
+        self.step1_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step1_entry_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+        self.step1_label1.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        self.step1_entry1.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.step1_label2.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
+        self.step1_entry2.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+        self.step1_label3.grid(row=0, column=4, padx=5, pady=5, sticky="ew")
+        self.step1_entry3.grid(row=0, column=5, padx=5, pady=5, sticky="ew")
+
+        self.step2_label.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step2_button.grid(row=3, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self.step3_label.grid(row=4, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step3_button.grid(row=5, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self.step4_button.grid(row=7, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+    def download_installer(self):
+        download_pup = EndpointDownloader(self, "Downloading Endpoint Installer")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        import customtkinter as gui
+from frontend.components.EndpointDownloader import EndpointDownloader
+from PIL import Image
+
+class EndpointRegistration(gui.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.master = master
+        self.step2_button = None
+        self.step3_button = None
+        self.step4_button = None # Add step4 back
+        self.ctk_completed_image = None
+        self.completed_image = None
+        self._configure_ui()
+        self._create_widgets()
+        self._layout_widgets()
+
+    def _configure_ui(self):
+        """Configures the UI appearance and grid layout."""
+        self.configure(fg_color="#2B2B2B")
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+    def _create_widgets(self):
+        """Creates and initializes all UI widgets."""
+        self.view_title_frame = gui.CTkFrame(self)
+        self.view_title = gui.CTkLabel(
+            self.view_title_frame,
+            text="Register Endpoint",
+            font=gui.CTkFont(size=20, weight="bold"),
+            wraplength=700,
+            justify="center",
+        )
+
+        self.form_body = gui.CTkFrame(self)
+        self.form_body.configure(fg_color="#000000")
+        self.form_body.grid_columnconfigure(0, weight=1)
+        for i in range(5): # modified to include step 4
+            self.form_body.grid_rowconfigure(i * 2, weight=1)
+            self.form_body.grid_rowconfigure(i * 2 + 1, weight=1)
+
+        self.step1_label = gui.CTkLabel(self.form_body, text="STEP 1: DEFINE ENDPOINT", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.step1_entry_frame = gui.CTkFrame(self.form_body)
+        self.step1_entry_frame.grid_columnconfigure(1, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.grid_columnconfigure(3, weight=2)  # Give more weight to entries
+        self.step1_entry_frame.grid_columnconfigure(5, weight=2)
+        self.step1_entry_frame.configure(fg_color="#000000")
+
+        self.step1_label1 = gui.CTkLabel(self.step1_entry_frame, text="Name", anchor="center") # modified anchor
+        self.step1_entry1 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry1.configure(fg_color="#FFFFFF")
+        self.step1_label2 = gui.CTkLabel(self.step1_entry_frame, text="IP Address", anchor="center") # modified anchor
+        self.step1_entry2 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry2.configure(fg_color="#FFFFFF")
+        self.step1_label3 = gui.CTkLabel(self.step1_entry_frame, text="SSH Username", anchor="center") # modified anchor
+        self.step1_entry3 = gui.CTkEntry(self.step1_entry_frame, text_color="#000000", border_color="#FFFFFF")
+        self.step1_entry3.configure(fg_color="#FFFFFF")
+
+        self.step2_label = gui.CTkLabel(self.form_body, text="STEP 2: DOWNLOAD ENDPOINT INSTALLER",font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.download_image = Image.open("./frontend/assets/icons/download.png")
+        self.ctk_download_image = gui.CTkImage(light_image=self.download_image, dark_image=self.download_image, size=(25, 25))
+        self.step2_button = gui.CTkButton(self.form_body,image=self.ctk_download_image, text="Download Endpoint Installer", command=self.download_installer)
+
+        self.step3_label = gui.CTkLabel(self.form_body, text="STEP 3: TEST CONNECTION", font=gui.CTkFont(size=15, weight="bold"), anchor="w")
+        self.test_image = Image.open("./frontend/assets/icons/Test.png")
+        self.ctk_test_image = gui.CTkImage(light_image=self.test_image, dark_image=self.test_image, size=(25, 25))
+        self.step3_button = gui.CTkButton(self.form_body,image=self.ctk_test_image, text="Test Connection (Not Yet Tested)")
+        self.step3_button.configure(state="disabled", fg_color="#2b2b2b")
+
+        # Step 4 without label
+        self.complete_reg_image = Image.open("./frontend/assets/icons/check-list.png")
+        self.ctk_complete_reg_image = gui.CTkImage(light_image=self.complete_reg_image, dark_image=self.complete_reg_image, size=(25, 25))
+        self.step4_button = gui.CTkButton(self.form_body, image=self.ctk_complete_reg_image, text="Complete Registration")
+        self.step4_button.configure(state="disabled", fg_color="#2b2b2b")
+
+    def _layout_widgets(self):
+        """Arranges the widgets within the grid layout."""
+        self.view_title_frame.grid(row=0, column=0, padx=40, pady=20, sticky="nsew")
+        self.view_title.pack(pady=(0, 0), padx=0, fill="x")
+
+        self.form_body.grid(row=1, column=0, padx=100, pady=(0, 20), sticky="nsew")
+
+        self.step1_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step1_entry_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+        self.step1_label1.grid(row=0, column=0, padx=5, pady=(5,0), sticky="ew") # modified pady
+        self.step1_entry1.grid(row=1, column=0, padx=5, pady=(0,5), sticky="ew") # modified pady
+        self.step1_label2.grid(row=0, column=2, padx=5, pady=(5,0), sticky="ew") # modified pady
+        self.step1_entry2.grid(row=1, column=2, padx=5, pady=(0,5), sticky="ew") # modified pady
+        self.step1_label3.grid(row=0, column=4, padx=5, pady=(5,0), sticky="ew") # modified pady
+        self.step1_entry3.grid(row=1, column=4, padx=5, pady=(0,5), sticky="ew") # modified pady
+
+        self.step2_label.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step2_button.grid(row=3, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self.step3_label.grid(row=4, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.step3_button.grid(row=5, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        # Step 4 layout
+        self.step4_button.grid(row=7, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+    def download_installer(self):
+        download_pup = EndpointDownloader(self, "Downloading Endpoint Installer")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    import subprocess
+import datetime
+import time
+import statistics
+
+def ping_device(device_ip, count=1):
+    """Pings a device and returns RTT and packet loss."""
+    try:
+        result = subprocess.run(
+            ["ping", "-c", str(count), device_ip],
+            capture_output=True,
+            text=True,
+            timeout=10,  # Timeout after 10 seconds
+        )
+        output = result.stdout
+        if "time=" in output:
+            rtt_values = []
+            lines = output.split('\n')
+            for line in lines:
+                if "time=" in line:
+                    time_str = line.split("time=")[1].split(" ms")[0]
+                    rtt_values.append(float(time_str))
+            if rtt_values:
+                rtt = statistics.mean(rtt_values) #in case ping -c is greater than 1.
+            else:
+                rtt = None
+        else:
+            rtt = None
+
+        packet_loss = None
+        if "packet loss" in output:
+            try:
+                packet_loss_str = output.split("packet loss")[0].split(",")[-1].strip().replace("%","")
+                packet_loss = float(packet_loss_str)
+            except (ValueError, IndexError):
+                pass
+
+        return rtt, packet_loss
+
+    except subprocess.TimeoutExpired:
+        return None, None
+    except Exception as e:
+        print(f"Error pinging {device_ip}: {e}")
+        return None, None
+
+def collect_rtt_data(device_ip, days=7, pings_per_day=4):
+    """Collects RTT and packet loss data for a specified number of days."""
+    all_rtt_values = []
+    for day in range(days):
+        daily_rtt_values = []
+        for ping_num in range(pings_per_day):
+            rtt, packet_loss = ping_device(device_ip)
+            if rtt is not None:
+                all_rtt_values.append(rtt)
+                daily_rtt_values.append(rtt)
+                print(f"Day {day + 1}, ping {ping_num + 1}: RTT={rtt:.2f}ms, Packet Loss={packet_loss:.2f}%")
+            else:
+                print(f"Ping failed on day {day + 1}, ping {ping_num + 1}")
+            time.sleep(21600 / pings_per_day) # sleep the appropriate amount of time between pings. 21600 seconds is 6 hours.
+        print(f"Day {day + 1} RTT values: {daily_rtt_values}")
+    return all_rtt_values
+
+def monitor_connection(device_ip):
+    """Monitors connection and calculates standard deviation with packet loss."""
+    initial_rtt_values = collect_rtt_data(device_ip, days=7)
+    if not initial_rtt_values:
+        print("Failed to collect initial RTT data.")
+        return
+
+    initial_mean = statistics.mean(initial_rtt_values)
+    print(f"Initial Mean RTT: {initial_mean:.2f} ms")
+
+    while True:
+        daily_rtt_values = []
+        daily_packet_loss_values = []
+        for ping_num in range(4):
+            rtt, packet_loss = ping_device(device_ip)
+            if rtt is not None:
+                daily_rtt_values.append(rtt)
+                if packet_loss is not None:
+                    daily_packet_loss_values.append(packet_loss)
+                print(f"Monitoring ping {ping_num + 1}: RTT={rtt:.2f}ms, Packet Loss={packet_loss:.2f}%")
+            else:
+                print(f"Ping failed on monitoring ping {ping_num + 1}")
+            time.sleep(21600/4)
+
+        if daily_rtt_values:
+            try:
+                daily_std_dev = statistics.stdev(daily_rtt_values)
+                print(f"Daily RTT values: {daily_rtt_values}")
+                print(f"Daily Standard Deviation: {daily_std_dev:.2f} ms")
+                print(f"Deviation from Initial Mean: {statistics.mean(daily_rtt_values) - initial_mean:.2f} ms")
+                if daily_packet_loss_values:
+                    print(f"Daily average packet loss: {statistics.mean(daily_packet_loss_values):.2f}%")
+            except statistics.StatisticsError:
+                print("Not enough data points for standard deviation.")
+        else:
+            print("All daily pings failed.")
+
+        time.sleep(86400) # Sleep for one day.
+
+if __name__ == "__main__":
+    device_ip_to_ping = "8.8.8.8"  # Replace with your device IP
+    monitor_connection(device_ip_to_ping)
