@@ -55,7 +55,7 @@ def get_windows_volumes(hostname, username, port=22, key_filename=None):
             client.close()
 
 if __name__ == "__main__":
-    hostname = "3.144.219.127"  
+    hostname = "3.144.219.127"  #18.117.188.132
     username = "Administrator"  
     key_filename = os.path.join(os.path.expanduser("~"), ".ssh", "id_rsa")
 

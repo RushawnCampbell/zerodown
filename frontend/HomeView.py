@@ -52,14 +52,14 @@ class HomeView(gui.CTkFrame):
         self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node", command=self.master.show_storage_registration)
         self.button2.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
-        image3 = Image.open("./frontend/assets/icons/recover.png")
+        image3 = Image.open("./frontend/assets/icons/backup.png")
         self.ctk_image3 = gui.CTkImage(light_image=image3, dark_image=image3, size=(50, 50))
-        self.button3 = gui.CTkButton(self.button_frame, image=self.ctk_image3, text=" Recover \n Endpoint")
+        self.button3 = gui.CTkButton(self.button_frame, image=self.ctk_image3, text=" Create \n Backup", command=self.master.show_backup_job)
         self.button3.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
-        image4 = Image.open("./frontend/assets/icons/backup.png")
+        image4 = Image.open("./frontend/assets/icons/recover.png")
         self.ctk_image4 = gui.CTkImage(light_image=image4, dark_image=image4, size=(50, 50))
-        self.button4 = gui.CTkButton(self.button_frame, image=self.ctk_image4, text="Create \n Backup")
+        self.button4 = gui.CTkButton(self.button_frame, image=self.ctk_image4, text="Restore \n Endpoint")
         self.button4.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
 

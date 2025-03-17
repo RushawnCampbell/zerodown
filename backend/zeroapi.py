@@ -5,7 +5,7 @@ from .Sqlmodels.User import User
 from .Sqlmodels.Endpoint import Endpoint
 from .Sqlmodels.StorageNode import StorageNode
 from .Sqlmodels.ZeroCryptor import ZeroCryptor
-import os,jwt, logging, json, paramiko
+import os, sys,jwt, logging, json, paramiko
 from datetime import datetime, timezone
 
 class Zeroapi:
@@ -99,7 +99,8 @@ class Zeroapi:
                 try:
                     data = request.get_json()
                     hostname= data.get('hostname')
-                    username=data.get('endpoint_user')
+                    username=data.get('authorized_user')
+                    reg_type=data.get('reg_type')
                     pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
                     
                     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -108,18 +109,27 @@ class Zeroapi:
                     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
                     client.connect(hostname=hostname, username=username,  pkey=pkey)
+                    if reg_type == "storagenode":
+                        command = "type %USERPROFILE%\\.ssh\\id_rsa.pub"
+                        stdin, stdout, stderr = client.exec_command("cmd.exe /c \"" + command + "\"")
+                        fetched_pub = stdout.read().decode().strip()
+                        error = stderr.read().decode().strip()
+                        if not error:
+                            return jsonify({"response": fetched_pub}),200
+                        return jsonify({"response": fetched_pub}),401
                     client.close()
                     del pkey
-                    return jsonify({"message": "Successful Connection"}),200
+                    return jsonify({"response": "Connection Successful"}),200
                 except Exception as e:
+                    print(e)
                     return jsonify({
-                            "message": "Something went wrong. Contact the ZeroDown Support for help.",
+                            "response": "Something went wrong. Contact the ZeroDown Support for help.",
                         }),500
             else:
-                return jsonify({"message": "Access token is missing or invalid"}),401
+                return jsonify({"response": "Access token is missing or invalid"}),401
 
         except Exception as e:
-            return jsonify({"message": "Access token is missing or invalid"}),401
+            return jsonify({"response": "Access token is missing or invalid"}),401
         
 
 
@@ -134,30 +144,60 @@ class Zeroapi:
             fetched_user = User.query.filter_by(username=namepart).first()
             if namepart == fetched_user.username.lower():
                 data = request.get_json()
-                endpoint_name = data.get('name')
-                endpoint_ip= data.get('ip')
-                endpoint_user=data.get('endpoint_user')
+                object_name = data.get('name')
+                object_ip= data.get('ip')
+                object_user=data.get('authorized_user')
                 if register_type == "endpoint":
-                    endpoint_object = Endpoint(ip=endpoint_ip, name=endpoint_name, username=endpoint_user)
+                    endpoint_object = Endpoint(ip=object_ip, name=object_name, username=object_user)
                     db.session.add(endpoint_object)
                     db.session.commit()
-                    fetched_ip = endpoint_object.ip
-                    print("ENCRYPTED IP IS", fetched_ip)
-                    print("DECRYPTED IP IS", ZeroCryptor._decrypt_data(fetched_ip, "ENDPOINT"))
                     return jsonify({"message": "Endpoint Node Registered"}),200
-                if register_type == "storage":
-                    storage_object = StorageNode(ip=endpoint_ip, name=endpoint_name, username=endpoint_user,pub_key=None)
+                if register_type == "storagenode":
+                    pub_key=data.get('pub_key')
+                    storage_object = StorageNode(ip=object_ip, name=object_name, username=object_user,pub_key=pub_key)
                     db.session.add(storage_object)
                     db.session.commit()
-                    return jsonify({"message": "Endpoint Node Registered"}),200
+                    return jsonify({"message": "Storage Node Registered"}),200
             else:
-                print ("I AM HERE")
+                print("WITHOUT EXCEPTION")
                 return jsonify({"message": "Access token is missing or invalid"}),401
         except Exception as e:
-            print(e)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            print(f"An exception occurred: {e}")
+            print(f"Line number: {line_number}")
             return jsonify({"message": "Access token is missing or invalid"}),401
         
+    @app.route('/zeroapi/v1/objects/<object_type>', methods=['GET'])
+    def objects(object_type):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                try:
+                    if object_type == "endpoints":
+                        fetched_endpoints = Endpoint.query.all()
+                        endpoint_names = []
+                        for endpoint in fetched_endpoints:
+                            endpoint_names.append(endpoint.name)
 
+                        print("FETCHED IS",fetched_endpoints)
+                        return jsonify({
+                            "names" : endpoint_names
+                        })
+                    if object_type == "storagenodes":
+                        pass
+                    return jsonify({"message": "Hello"})
+                except Exception as e:
+                    return jsonify({
+                            "message": "Something went wrong. Contact the ZeroDown Support for help.",
+                        }),500
+        except Exception as e:
+            return jsonify({"message": "Access token is missing or invalid"}),401
 
 
 #HELPER METHODS

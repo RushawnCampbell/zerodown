@@ -6,6 +6,8 @@ from frontend.LoginView import LoginView
 from frontend.HomeView import HomeView
 from frontend.EndpointRegistration import EndpointRegistration
 from frontend.StorageRegistration import StorageRegistration
+from frontend.BackupJob import BackupJob
+
 from frontend.components.ToolBar import ToolBar
 from PIL import Image, ImageTk
 
@@ -68,22 +70,29 @@ class App(gui.CTk):
     def show_home_view(self):
         self.title("ZeroDown: Home")
         self.set_window_position(800,600)
-        self.login_view.grid_forget()  # Hide login view
+        self.login_view.grid_forget()  
         self.home_view = HomeView(self)
 
     def show_endpoint_registration(self):
         self.title("ZeroDown: Endpoint Registration")
         #self.set_window_position(800,600)
-        self.home_view.pack_forget()  # Hide login view
-        self.endpoint_reg_view = EndpointRegistration(self)
+        self.home_view.pack_forget()  
+        self.endpoint_reg_view = EndpointRegistration(self, "Endpoint")
         self.endpoint_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def show_storage_registration(self):
         self.title("ZeroDown: Storage Node Registration")
         #self.set_window_position(800,600)
-        self.home_view.pack_forget()  # Hide login view
-        self.storage_reg_view = StorageRegistration(self)
+        self.home_view.pack_forget()  
+        self.storage_reg_view = StorageRegistration(self, "Storage Node")
         self.storage_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+    def show_backup_job(self):
+        self.title("ZeroDown: Create Backup Job")
+        #self.set_window_position(800,600)
+        self.home_view.pack_forget()  
+        self.backup_job_view = BackupJob(self)
+        self.backup_job_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
 
     def get_windows_username(self):
@@ -130,28 +139,11 @@ class App(gui.CTk):
                 keyring.delete_password(service_name, username)
             else:
                 tkint.messagebox.showerror("Token Deletion Failed", "Could not determine username.")
-        except keyring.errors.PasswordDeleteError: #Added specific error handling
+        except keyring.errors.PasswordDeleteError: 
             tkint.messagebox.showerror("Token Deletion Failed", "Token not found.")
         except Exception as e:
             err_msg = str(e)
             tkint.messagebox.showerror("Token Deletion Failed", f"Error deleting token: {err_msg}")
 
 
-    """def show_backup_view(self, user_id):
-        self.login_view.pack_forget()  # Hide login view
-
-        self.backup_view = BackupView(self, user_id)
-        self.backup_view.pack(fill="both", expand=True)
-
-        self.restore_view = RestoreView(self, user_id)  # Initialize restore view
-        self.restore_view.pack(fill="both", expand=True)  # Show it initially"""
-
-        # switching between backup and restore views later
-        # switch_to_restore_button = ctk.CTkButton(self, text="Switch to Restore", command=self.show_restore_view)
-        # switch_to_restore_button.pack()
-        
-
-    # function to switch to restore view (we will implement switch back later)
-    # def show_restore_view(self):
-    #     self.backup_view.pack_forget()
-    #     self.restore_view.pack(fill="both", expand=True)
+    
