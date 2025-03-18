@@ -13,7 +13,7 @@ class Popup(gui.CTkToplevel):
         self.configure(fg_color="#FFFFFF")
 
     def fade_app(self):
-        self.master.master.attributes("-alpha", 0.3) 
+        self.master.master.attributes("-alpha", 0.9) 
     
     def unfade_app(self):
         self.master.master.attributes("-alpha", 1) 

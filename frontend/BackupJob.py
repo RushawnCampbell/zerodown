@@ -1,5 +1,6 @@
-import customtkinter as gui, ipaddress, requests, tkinter as tk
+import customtkinter as gui, requests, tkinter as tk
 from PIL import Image
+from frontend.components.BrowseStructure import BrowseStructure
 
 class BackupJob(gui.CTkFrame):
     def __init__(self, master):
@@ -42,7 +43,7 @@ class BackupJob(gui.CTkFrame):
         self.backup_type_dropdown = gui.CTkComboBox(self.form_frame, command=lambda label: self.set_responsive_button(label=f"{self.backup_type_dropdown.get()}"), values=backup_type_options,  dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000", fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000")
         self.backup_type_dropdown.grid(row=1, column=2, padx=(5, 20), pady=(5, 5), sticky="ew")
         
-        self.browse_items_button = gui.CTkButton(self.form_frame, state=tk.DISABLED, text="Browse", fg_color="#2b2b2b")
+        self.browse_items_button = gui.CTkButton(self.form_frame, state=tk.DISABLED, text="Browse", fg_color="#2b2b2b", command=self.browse_object)
         self.browse_items_button.grid(row=2, column=0, columnspan=3, pady=(10, 5), padx=20, sticky="ew")
 
         # Row 3: Storage Node, Browse Destination
@@ -113,9 +114,17 @@ class BackupJob(gui.CTkFrame):
         except Exception as e:
             tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
             return -1
+    
     def set_responsive_button(self, label):
         if not label.startswith("-"):
             self.browse_items_button.configure(text=f"Browse {label}", state="normal", fg_color="#1F6AA5") 
         else: 
             self.browse_items_button.configure(text="Browse", state="disabled", fg_color="#2b2b2b")
+
+    def browse_object(self):
+        endpoint_name=self.endpoint_dropdown.get()
+        backup_type=self.backup_type_dropdown.get()
+        title = f'{self.browse_items_button.cget("text")} on {endpoint_name}'
+        bobj=BrowseStructure(self, title, endpoint_name, backup_type)
+
         

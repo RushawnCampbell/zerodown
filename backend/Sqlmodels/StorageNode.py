@@ -14,13 +14,15 @@ class StorageNode(db.Model):
     pub_key = db.Column(db.Text,nullable=False)
 
     def __init__(self, ip, name, username, pub_key):
+        zcryptobj= ZeroCryptor()
+        zcryptobj._generate_key(type="STORAGE")
         try:
             ipaddress.ip_address(ip)
-            self.ip = ZeroCryptor._encrypt_data(data=ip, type="STORAGE")
+            self.ip = zcryptobj._encrypt_data(data=ip, type="STORAGE")
         except ValueError:
             raise ValueError(f"Invalid IP address: {ip}")
         self.name = name
         self.username = username
-        self.pub_key = ZeroCryptor._encrypt_data(data=pub_key, type="STORAGE")
+        self.pub_key = zcryptobj._encrypt_data(data=pub_key, type="STORAGE")
 
 

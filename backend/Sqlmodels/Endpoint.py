@@ -14,9 +14,10 @@ class Endpoint(db.Model):
     #pub_key = db.Column(db.Text)
 
     def __init__(self, ip, name, username):
+        zcryptobj= ZeroCryptor()
+        zcryptobj._generate_key(type="ENDPOINT")
         try:
             ipaddress.ip_address(ip)
-            zcryptobj= ZeroCryptor()
             self.ip = zcryptobj._encrypt_data(data=ip, type="ENDPOINT")
         except ValueError:
             raise ValueError(f"Invalid IP address")

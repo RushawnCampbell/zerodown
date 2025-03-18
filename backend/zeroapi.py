@@ -183,9 +183,9 @@ class Zeroapi:
                         fetched_endpoints = Endpoint.query.all()
                         endpoint_names = []
                         for endpoint in fetched_endpoints:
+                            #endpoint_names.append((endpoint.id,endpoint.name))
                             endpoint_names.append(endpoint.name)
 
-                        print("FETCHED IS",fetched_endpoints)
                         return jsonify({
                             "names" : endpoint_names
                         })
@@ -198,6 +198,53 @@ class Zeroapi:
                         }),500
         except Exception as e:
             return jsonify({"message": "Access token is missing or invalid"}),401
+        
+
+    @app.route('/zeroapi/v1/listing/<endpoint_name>/<backup_type>', methods=['GET'])
+    def listing(endpoint_name, backup_type):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                fetched_endpoint= Endpoint.query.filter_by(name=endpoint_name).first()
+                logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+                try:
+                    zcryptobj= ZeroCryptor()
+                    encrypted_hostname= fetched_endpoint.ip
+                    hostname = zcryptobj._decrypt_data(encrypted_data=encrypted_hostname, type="ENDPOINT")
+                    username= fetched_endpoint.username
+                    pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+
+                    client = paramiko.SSHClient()
+                    client.load_system_host_keys()
+                    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                    client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
+
+                    command = 'powershell.exe -ExecutionPolicy Bypass -command "Get-Volume | Select-Object -ExpandProperty DriveLetter | ConvertTo-Json"'
+                    _, stdout, stderr = client.exec_command(command)
+                    output = stdout.read().decode('utf-8').strip()
+                    output = json.loads(output)
+                    error = stderr.read().decode().strip()
+                    client.close()
+                    if not error:
+                        print("DATA IS", output)
+                        return jsonify({"response": output}),200
+                    return jsonify({"response": "nothing found"}),401
+                except Exception as e:
+                    print(e)
+                    return jsonify({
+                        "response": "Something went wrong. Contact the ZeroDown Support for help.",
+                    }),500
+        except Exception as e:
+            print(e)
+            return jsonify({
+                    "response": "Something went wrong. Contact the ZeroDown Support for help.",
+            }),500
+
 
 
 #HELPER METHODS

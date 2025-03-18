@@ -1,61 +1,82 @@
-from cryptography.fernet import Fernet
-import os, hashlib
+from cryptography.fernet import Fernet,InvalidToken, InvalidSignature
+import os, hashlib, keyring, getpass
 
 class ZeroCryptor:
 
     def __init__(self):
         pass
      
-    @staticmethod
-    def _generate_key(type):
-        if type == "STORAGE" and os.environ.get('ZEROGUARDIAN_STORAGE'):
-            return None
-        
-        if type == "ENDPOINT" and os.environ.get('ZEROGUARDIAN_ENDPOINT'):
-            return None
+    def _generate_key(self, type):
+        if self._get_key(type) is None:
+            key = Fernet.generate_key()
+            key_str = key.decode()
+            windows_user = self.get_windows_username()
+            self.store_crypto_key(windows_user, key_str, type)
 
-        key = Fernet.generate_key()
-        key_str = key.decode()
-
-        if type == "STORAGE":
-            os.environ['ZEROGUARDIAN_STORAGE'] = key_str
-            return key_str
-        
-        if type == "ENDPOINT":
-            os.environ['ZEROGUARDIAN_ENDPOINT'] = key_str
-            return key_str
-        return -1
+    def store_crypto_key(self,windows_user, key_str ,type):
+        try:
+            service_name = f"Z_{type}_KEY"
+            username = windows_user
+            keyring.set_password(service_name, username, key_str)
+        except Exception as e:
+            err_msg = str(e)
+            print("Token Storage Failed", f"Error storing token: {err_msg}")
     
-    @staticmethod 
-    def _get_key(type):
-        key=""
-        if type =="STORAGE":
-            key = os.environ.get('ZEROGUARDIAN_STORAGE')
-        if type == "ENDPOINT":
-            key = os.environ.get("ZEROGUARDIAN_ENDPOINT")
-        if not key or key == None:
-            key = ZeroCryptor._generate_key(type)
-            if key == -1:
-                raise ValueError(f"Error Generating Key")
-        return Fernet(key.encode())
 
-    @staticmethod 
-    def _encrypt_data(data, type):
-        key = ZeroCryptor._get_key(type)
+    def _get_key(self, type):
+        service_name = f"Z_{type}_KEY"
+        username = self.get_windows_username()
+        try:
+            key = keyring.get_password(service_name, username)
+            if not key:
+                return None
+            return Fernet(key.encode())
+        except Exception as e:
+            err_msg = str(e)
+            print("Token Retrieval Failed", f"Error retrieving token: {err_msg}")
+            return None  
+    
+
+    def _encrypt_data(self,data, type):
+        key = self._get_key(type)
         return key.encrypt(data.encode())
     
-    @staticmethod 
-    def _decrypt_data(encrypted_data, type):
-        try:
-            key = ZeroCryptor._get_key(type)
-            return key.decrypt(encrypted_data).decode()
-        except Exception as e:
-            print("ERROR IS", e)
     
-    @staticmethod
+    def _decrypt_data(self,encrypted_data, type):
+        try:
+            key = self._get_key(type)
+            return key.decrypt(encrypted_data).decode()
+        except InvalidToken:
+            print(f"Decryption failed: Invalid token")
+            return None  # Or raise an exception
+        except InvalidSignature:
+            print(f"Decryption failed: Invalid signature")
+            return None
+        except TypeError as e:
+            print(f"Decryption failed: Type error - {e}")
+            return None
+        except Exception as e:
+            print(f"Decryption failed: Unexpected error - {e} ")
+            return None
+    
+    
     def _hash_data(data):
         return hashlib.sha256(data.encode('utf-8')).hexdigest()
     
-    @staticmethod
+   
     def _verify_hash(self, hash, data):
         return hash == self.hash_data(data)
+    
+  
+    def get_windows_username(self):
+        try:
+            username = os.getlogin()
+            return username
+        except OSError:
+            try:
+                username = getpass.getuser()
+                return username
+            except Exception as e:
+                print(f"Error getting username: {e}")
+                return None
+    

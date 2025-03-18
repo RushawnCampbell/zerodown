@@ -145,5 +145,10 @@ class App(gui.CTk):
             err_msg = str(e)
             tkint.messagebox.showerror("Token Deletion Failed", f"Error deleting token: {err_msg}")
 
+    #def store_crypto_key(windows_user, key_str,type):
+
+    def retrieve_crypto_key(self):
+        pass
+
 
     
