@@ -1,11 +1,12 @@
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import ttk
 from PIL import Image, ImageTk
+import tkinter as tk  # Import tkinter explicitly for BooleanVar
 
-class DriveExplorerTkinter(tk.Tk):
+class DriveExplorerCustomTkinter(ctk.CTk):
     def __init__(self, directory_lines):
         super().__init__()
-        self.title("Drive Explorer (Tkinter)")
+        self.title("Drive Explorer (CustomTkinter)")
         self.geometry("300x400")
 
         self.directory_lines = directory_lines
@@ -31,13 +32,13 @@ class DriveExplorerTkinter(tk.Tk):
         self.unchecked_image = ImageTk.PhotoImage(unchecked_image)
 
     def create_treeview(self):
-        frame = ttk.Frame(self)
+        frame = ctk.CTkFrame(self)
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.tree = ttk.Treeview(master=frame, yscrollcommand=self.on_scrollbar, show="tree headings")
         self.tree.grid(row=0, column=0, sticky="nsew")
 
-        self.scrollbar = ttk.Scrollbar(master=frame, orient="vertical", command=self.tree.yview)
+        self.scrollbar = ctk.CTkScrollbar(master=frame, orientation="vertical", command=self.tree.yview)
         self.scrollbar.grid(row=0, column=1, sticky="ns")
 
         self.tree.configure(yscrollcommand=self.scrollbar.set)
@@ -49,7 +50,7 @@ class DriveExplorerTkinter(tk.Tk):
         self.build_tree_from_lines()
 
         self.tree.bind("<Button-1>", self.on_tree_click)
-        self.tree.bind("<Button-3>", self.on_right_click) # Added right-click binding
+        self.tree.bind("<Button-3>", self.on_right_click)
 
     def on_scrollbar(self, *args):
         self.tree.yview(*args)
@@ -71,37 +72,24 @@ class DriveExplorerTkinter(tk.Tk):
             for name, subdata in data.items():
                 full_path = f"{path}\\{name}" if path else name
                 item = self.tree.insert(parent, "end", text=name, open=False, image=self.unchecked_image)
-                self.checkbox_vars[item] = tk.BooleanVar(value=False)
+                self.checkbox_vars[item] = tk.BooleanVar(value=False) # Corrected: using tk.BooleanVar
                 if subdata:
                     insert_items(item, subdata, full_path)
 
         for drive, data in tree_data.items():
             drive_item = self.tree.insert("", "end", text=drive, open=False, image=self.unchecked_image)
-            self.checkbox_vars[drive_item] = tk.BooleanVar(value=False)
+            self.checkbox_vars[drive_item] = tk.BooleanVar(value=False) # Corrected: using tk.BooleanVar
             insert_items(drive_item, data)
 
     def on_tree_click(self, event):
-        # Check if the click was on the image region
-        region = self.tree.identify_region(event.x, event.y)
-        if region == "image":
-            item = self.tree.identify_row(event.y)
-            if item:
-                self.toggle_checkbox(item)
-        else:
-            # If clicked on the text, you might want to handle it differently
-            item = self.tree.identify_row(event.y)
-            if item:
-                print(f"Clicked on text of item: {self.tree.item(item, 'text')}")
-                # Optionally, you could also toggle the checkbox here if desired
-                # self.toggle_checkbox(item)
-                pass
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.toggle_checkbox(item)
 
     def on_right_click(self, event):
-        # Handle right-click events if needed
         item = self.tree.identify_row(event.y)
         if item:
             print(f"Right-clicked on item: {self.tree.item(item, 'text')}")
-            # You could show a context menu here
 
     def toggle_checkbox(self, item):
         if item in self.checkbox_vars:
@@ -147,5 +135,5 @@ if __name__ == "__main__":
         "M:\\AnotherDriveFolder",
     ]
 
-    app = DriveExplorerTkinter(directory_lines)
+    app = DriveExplorerCustomTkinter(directory_lines)
     app.mainloop()
