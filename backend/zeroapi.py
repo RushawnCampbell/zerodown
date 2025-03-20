@@ -66,7 +66,7 @@ class Zeroapi:
             fetched_user = User.query.filter_by(username=namepart).first()
             if namepart == fetched_user.username.lower():
                 try:
-                    filename = f'{download_type}.exe'
+                    filename = f'{download_type}.zip'
                     file_path = os.path.join(app.root_path,"..\\","dist", filename) 
         
                     return send_file(
@@ -200,8 +200,8 @@ class Zeroapi:
             return jsonify({"message": "Access token is missing or invalid"}),401
         
 
-    @app.route('/zeroapi/v1/listing/<endpoint_name>/<backup_type>', methods=['GET'])
-    def listing(endpoint_name, backup_type):
+    @app.route('/zeroapi/v1/listing/<endpoint_name>', methods=['GET'])
+    def listing(endpoint_name):
         user_token= request.headers['Authorization'].split(' ')[1]
         if not user_token:
             return jsonify({"message": "Access token is missing or invalid"}),401
@@ -210,6 +210,7 @@ class Zeroapi:
             namepart= decoded['sub'].lower()
             fetched_user = User.query.filter_by(username=namepart).first()
             if namepart == fetched_user.username.lower():
+
                 fetched_endpoint= Endpoint.query.filter_by(name=endpoint_name).first()
                 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
                 try:
@@ -218,21 +219,18 @@ class Zeroapi:
                     hostname = zcryptobj._decrypt_data(encrypted_data=encrypted_hostname, type="ENDPOINT")
                     username= fetched_endpoint.username
                     pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
-
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     client.set_missing_host_key_policy(paramiko.RejectPolicy())
                     client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
-
-                    command = 'powershell.exe -ExecutionPolicy Bypass -command "Get-Volume | Select-Object -ExpandProperty DriveLetter | ConvertTo-Json"'
-                    _, stdout, stderr = client.exec_command(command)
+                    command= 'Get-WmiObject Win32_Volume | ForEach-Object {$DriveLetter=$_.DriveLetter; if ($DriveLetter) {Get-ChildItem -Path "$DriveLetter\" -Directory -Recurse -Force | Select-Object -ExpandProperty FullName | ForEach-Object {$_}}} | Out-String -Stream | ForEach-Object {$_.TrimEnd()}'
+                    _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
                     output = stdout.read().decode('utf-8').strip()
-                    output = json.loads(output)
-                    error = stderr.read().decode().strip()
+                    error = stderr.read().decode('utf-8').strip()
                     client.close()
+                    directory_listing =output.split('\n')
                     if not error:
-                        print("DATA IS", output)
-                        return jsonify({"response": output}),200
+                        return jsonify({"response": directory_listing}),200
                     return jsonify({"response": "nothing found"}),401
                 except Exception as e:
                     print(e)

@@ -26,7 +26,7 @@ class SetupDownloader(Popup):
 
         gif_label = gui.CTkLabel(self, text="")
         gif_label.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
-        instruct1 = gui.CTkLabel(self, text=f'1. Run the downloaded zero{self.master.reg_type.replace(" ", "").lower()}_setup.exe as Administrator on the {self.master.reg_type} ',
+        instruct1 = gui.CTkLabel(self, text=f'1. Run the downloaded zero{self.master.reg_type.replace(" ", "").lower()}_setup.zip as Administrator on the {self.master.reg_type} ',
                                         wraplength=390,
                                         )
         instruct1.grid(row=1, column=0, sticky="w", padx=(20, 20), pady=10) 
@@ -56,14 +56,14 @@ class SetupDownloader(Popup):
             
 
             downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
-            file_path = os.path.join(downloads_path, f"{filename}.exe")
+            file_path = os.path.join(downloads_path, f"{filename}.zip")
 
             with open(file_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:  
                         f.write(chunk)
             
-            tk.messagebox.showinfo("Download Complete", f"File '{filename}.exe' downloaded successfully!")
+            tk.messagebox.showinfo("Download Complete", f"File '{filename}.zip' downloaded successfully!")
             self.master.completed_image = Image.open("./frontend/assets/icons/check.png")
             self.master.ctk_completed_image = gui.CTkImage(light_image=self.master.completed_image, dark_image=self.master.completed_image, size=(25, 25))
             self.master.step2_button.configure(image=self.master.ctk_completed_image, fg_color="#1fa59d", text="Download Complete" )

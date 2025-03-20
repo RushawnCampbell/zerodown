@@ -1,12 +1,13 @@
 import customtkinter as gui, requests, tkinter as tk
 from PIL import Image
-from frontend.components.BrowseStructure import BrowseStructure
+from frontend.components.RemoteExplorer import RemoteExplorer
 
 class BackupJob(gui.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         self.create_widgets()
+        self.directory_listing = []
 
     def create_widgets(self):
         # Title Frame
@@ -54,7 +55,7 @@ class BackupJob(gui.CTkFrame):
         self.storage_node_dropdown = gui.CTkComboBox(self.form_frame, values=storage_node_options, fg_color="#2b2b2b", border_color="#2b2b2b", text_color="#000000",state=tk.DISABLED)
         self.storage_node_dropdown.grid(row=4, column=0, padx=(20, 5), pady=(5, 5), sticky="ew")
 
-        self.browse_destination_button = gui.CTkButton(self.form_frame, text="Browse Destination", state=tk.DISABLED, fg_color="#2b2b2b")
+        self.browse_destination_button = gui.CTkButton(self.form_frame, text="Select Storage Destination", state=tk.DISABLED, fg_color="#2b2b2b", command=self.select_storage_node)
         self.browse_destination_button.grid(row=4, column=1, padx=(5, 20), pady=(5, 5), sticky="ew", columnspan=2)
 
         # Row 5: Make Copies On Another Storage Node Switch + Add another storage button.
@@ -121,10 +122,32 @@ class BackupJob(gui.CTkFrame):
         else: 
             self.browse_items_button.configure(text="Browse", state="disabled", fg_color="#2b2b2b")
 
+    def get_listing(self, endpoint_name):
+        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/listing/{endpoint_name.lower()}"
+        zauth_token = self.master.retrieve_auth_token()
+        zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
+        del zauth_token
+        try:
+            response = requests.get( resource_url, stream=True, headers=zeroheaders)
+            response.raise_for_status()
+            directory_listing = response.json()
+            self.directory_listing= directory_listing['response']
+        except requests.exceptions.RequestException as e:
+            tk.messagebox.showerror("Fetch Error", f"Failed to fetch {e}")
+            #return -1
+        except Exception as e:
+            tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
+            #return -1
+    
+    def select_storage_node(self):
+        print(self.directory_listing)
+
     def browse_object(self):
+        virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
+        applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         endpoint_name=self.endpoint_dropdown.get()
-        backup_type=self.backup_type_dropdown.get()
         title = f'{self.browse_items_button.cget("text")} on {endpoint_name}'
-        bobj=BrowseStructure(self, title, endpoint_name, backup_type)
+        self.get_listing(endpoint_name)
+        RemoteExplorer(self, title, endpoint_name,self.directory_listing, virtual_machines, applications)
 
         
