@@ -8,17 +8,14 @@ from flask import jsonify
 import requests
 
 class RemoteExplorer(Popup):
-    def __init__(self, master, title, endpoint_name, directory_listing, virtual_machines, applications):
+    def __init__(self, master, title, endpoint_name):
         super().__init__(master, title)
         self.master =master
         self.endpoint_name = endpoint_name
         self.configure(fg_color="#2B2B2B")
         self.after(500, self.custom_set_pos)
-        self.directory_listing = directory_listing
-        self.virtual_machines = virtual_machines
-        self.applications = applications
         self.checkbox_vars = {}
-        self.checked_items = {}  # Changed to a dictionary
+        self.checked_items = {}  
         self.load_checkbox_images()
         self.create_three_column_layout()
         self.create_bottom_buttons()
@@ -119,6 +116,8 @@ class RemoteExplorer(Popup):
 
     def continue_selection(self):
         self.master.directory_listing = self.checked_items
+        print( self.master.directory_listing)
+        self.master.backup_demand = self.get_backup_demand( self.master.directory_listing)
         self.master.browse_destination_button.configure(state='normal', fg_color="#1F6AA5")
         self.on_close()
 
@@ -127,7 +126,7 @@ class RemoteExplorer(Popup):
 
     def build_drive_tree_from_lines(self):
         tree_data = {}
-        for line in self.directory_listing:
+        for line in self.master.directory_listing:
             parts = line.split("\\")
             drive = parts[0]
             if drive not in tree_data:
@@ -141,6 +140,7 @@ class RemoteExplorer(Popup):
         def insert_items(parent, data, path=""):
             for name, subdata in data.items():
                 full_path = f"{path}\\{name}" if path else name
+                full_path = full_path.rstrip('\r')
                 item = self.drive_tree.insert(parent, "end", text=name, open=False, image=self.unchecked_image)
                 self.checkbox_vars[item] = tk.BooleanVar(value=False)
                 if subdata:
@@ -153,13 +153,13 @@ class RemoteExplorer(Popup):
 
     def build_vm_tree(self):
         root = self.vm_tree.insert("", "end", text="Virtual Machines", open=True)
-        for vm in self.virtual_machines:
+        for vm in self.master.virtual_machines:
             item = self.vm_tree.insert(root, "end", text=vm, image=self.unchecked_image)
             self.checkbox_vars[item] = tk.BooleanVar(value=False)
 
     def build_app_tree(self):
         root = self.app_tree.insert("", "end", text="Applications", open=True)
-        for app in self.applications:
+        for app in self.master.applications:
             item = self.app_tree.insert(root, "end", text=app, image=self.unchecked_image)
             self.checkbox_vars[item] = tk.BooleanVar(value=False)
 
@@ -185,20 +185,21 @@ class RemoteExplorer(Popup):
                     path_components.insert(0, parent_text)
                     parent = tree.parent(parent)
                 full_path = "\\".join(path_components)
+                full_path= full_path.rstrip('\r')
 
                 if tree == self.drive_tree:
-                    drive = full_path.split("\\")[0]
+                    drive = full_path.split('\\')[0]
                     if drive not in self.checked_items:
-                        self.checked_items[drive] = set()
-                    self.checked_items[drive].add(full_path)
+                        self.checked_items[drive] = {}
+                    self.checked_items[drive][full_path]=0
                 elif tree == self.vm_tree:
                     if "Virtual Machines" not in self.checked_items:
-                        self.checked_items["Virtual Machines"] = set()
-                    self.checked_items["Virtual Machines"].add(item_text)
+                        self.checked_items["Virtual Machines"] = {}
+                    self.checked_items["Virtual Machines"][item_text]=0
                 elif tree == self.app_tree:
                     if "Applications" not in self.checked_items:
-                        self.checked_items["Applications"] = set()
-                    self.checked_items["Applications"].add(item_text)
+                        self.checked_items["Applications"] = {}
+                    self.checked_items["Applications"][item_text]=0
 
             else:
                 tree.item(item, image=self.unchecked_image)
@@ -210,11 +211,12 @@ class RemoteExplorer(Popup):
                     path_components.insert(0, parent_text)
                     parent = tree.parent(parent)
                 full_path = "\\".join(path_components)
+                full_path= full_path.rstrip('\r')
 
                 if tree == self.drive_tree:
                     drive = full_path.split("\\")[0]
                     if drive in self.checked_items and full_path in self.checked_items[drive]:
-                        self.checked_items[drive].remove(full_path)
+                        del self.checked_items[drive][full_path]
                         if not self.checked_items[drive]:
                             del self.checked_items[drive]
                 elif tree == self.vm_tree:
@@ -234,6 +236,24 @@ class RemoteExplorer(Popup):
 
     def on_single_click(self, event):
         pass
+
+    def get_backup_demand(self,jsondata):
+        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/endpoint/backupdemand/{self.endpoint_name}"
+        zauth_token = self.master.master.retrieve_auth_token()
+        zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
+        del zauth_token
+        try:
+            response = requests.post( resource_url, stream=True, headers=zeroheaders, json=jsondata)
+            response.raise_for_status()
+            directory_listing = response.json()
+            self.directory_listing= directory_listing
+        except requests.exceptions.RequestException as e:
+            tk.messagebox.showerror("Fetch Error", f"Failed to obtain backup demand {e}")
+            #return -1
+        except Exception as e:
+            print("ERROR IS",e)
+            tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
+            #return -1
 
 
     

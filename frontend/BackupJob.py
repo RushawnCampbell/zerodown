@@ -7,7 +7,10 @@ class BackupJob(gui.CTkFrame):
         super().__init__(master)
         self.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         self.create_widgets()
-        self.directory_listing = []
+        self.backup_demand =  float('inf')
+        self.directory_listing = {}
+        self.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
+        self.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
 
     def create_widgets(self):
         # Title Frame
@@ -44,11 +47,11 @@ class BackupJob(gui.CTkFrame):
         self.backup_type_dropdown = gui.CTkComboBox(self.form_frame, command=lambda label: self.set_responsive_button(label=f"{self.backup_type_dropdown.get()}"), values=backup_type_options,  dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000", fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000")
         self.backup_type_dropdown.grid(row=1, column=2, padx=(5, 20), pady=(5, 5), sticky="ew")
         
-        self.browse_items_button = gui.CTkButton(self.form_frame, state=tk.DISABLED, text="Browse", fg_color="#2b2b2b", command=self.browse_object)
+        self.browse_items_button = gui.CTkButton(self.form_frame, state=tk.DISABLED, text="Browse Backup Items", fg_color="#2b2b2b", command=self.browse_object)
         self.browse_items_button.grid(row=2, column=0, columnspan=3, pady=(10, 5), padx=20, sticky="ew")
 
         # Row 3: Storage Node, Browse Destination
-        storage_node_label = gui.CTkLabel(self.form_frame, text="Primary Node")
+        storage_node_label = gui.CTkLabel(self.form_frame, text="Primary Storage Node")
         storage_node_label.grid(row=3, column=0, padx=(20, 5), pady=(5, 5), sticky="w")
 
         storage_node_options = ["Node A", "Node B", "Node C"]
@@ -60,7 +63,7 @@ class BackupJob(gui.CTkFrame):
 
         # Row 5: Make Copies On Another Storage Node Switch + Add another storage button.
         self.copy_switch_var = tk.BooleanVar()
-        self.copy_switch = gui.CTkSwitch(self.form_frame, text="Make Copies On Another Storage Node", variable=self.copy_switch_var)
+        self.copy_switch = gui.CTkSwitch(self.form_frame, text="Make Copies On Other Storage Nodes", variable=self.copy_switch_var)
         self.copy_switch.grid(row=5, column=0, pady=(20, 5), padx=20, sticky="ew", columnspan=2)
 
         self.add_storage_button = gui.CTkButton(self.form_frame, text="Add Another Storage", fg_color="#2b2b2b", state=tk.DISABLED)
@@ -68,7 +71,7 @@ class BackupJob(gui.CTkFrame):
 
         # Row 6: Scrollable Frame for Additional Storage Nodes
         self.additional_storage_frame = gui.CTkScrollableFrame(self.form_frame, fg_color="#2b2b2b")
-        self.additional_storage_frame.configure(height=50)
+        self.additional_storage_frame.configure(height=100)
         self.additional_storage_frame._scrollbar.configure(height=10)
         self.additional_storage_frame.grid(row=6, column=0, columnspan=3, pady=(0,0), padx=20, sticky="ew")
         self.additional_storage_frame.grid_columnconfigure(0, weight=1)
@@ -131,11 +134,12 @@ class BackupJob(gui.CTkFrame):
             response = requests.get( resource_url, stream=True, headers=zeroheaders)
             response.raise_for_status()
             directory_listing = response.json()
-            self.directory_listing= directory_listing['response']
+            self.directory_listing= directory_listing
         except requests.exceptions.RequestException as e:
             tk.messagebox.showerror("Fetch Error", f"Failed to fetch {e}")
             #return -1
         except Exception as e:
+            print("ERROR IS",e)
             tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
             #return -1
     
@@ -143,11 +147,9 @@ class BackupJob(gui.CTkFrame):
         print(self.directory_listing)
 
     def browse_object(self):
-        virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
-        applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         endpoint_name=self.endpoint_dropdown.get()
         title = f'{self.browse_items_button.cget("text")} on {endpoint_name}'
         self.get_listing(endpoint_name)
-        RemoteExplorer(self, title, endpoint_name,self.directory_listing, virtual_machines, applications)
+        RemoteExplorer(self, title, endpoint_name)
 
         

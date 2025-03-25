@@ -228,9 +228,10 @@ class Zeroapi:
                     output = stdout.read().decode('utf-8').strip()
                     error = stderr.read().decode('utf-8').strip()
                     client.close()
-                    directory_listing =output.split('\n')
+                    directory_list =output.split('\n')
+                    directory_dict =  {path: "" for path in directory_list if path}
                     if not error:
-                        return jsonify({"response": directory_listing}),200
+                        return jsonify(directory_dict),200
                     return jsonify({"response": "nothing found"}),401
                 except Exception as e:
                     print(e)
@@ -243,7 +244,44 @@ class Zeroapi:
                     "response": "Something went wrong. Contact the ZeroDown Support for help.",
             }),500
 
+    @app.route('/zeroapi/v1/endpoint/backupdemand/<endpoint_name>', methods=['POST'])
+    def backupdemand(endpoint_name):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                data = request.get_json()
+                fetched_endpoint= Endpoint.query.filter_by(name=endpoint_name).first()
+                zcryptobj= ZeroCryptor()
+                encrypted_hostname= fetched_endpoint.ip
+                hostname = zcryptobj._decrypt_data(encrypted_data=encrypted_hostname, type="ENDPOINT")
+                username= fetched_endpoint.username
+                pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+                client = paramiko.SSHClient()
+                client.load_system_host_keys()
+                client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
+                for drive in data:
+                    for path,size in data[drive]:
+                        command= f'(Get-ChildItem -Path {path} -Force | Measure-Object -Property Length -Sum).Sum'
+                        _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+                        object_size = stdout.read().decode('utf-8').strip()
+                        error = stderr.read().decode('utf-8').strip()
+                        data[drive][path] = object_size
+                    pass
+                return jsonify({
+                    "response": "DATA IS ",
+                }),200
 
+        except Exception as e:
+            print(e)
+            return jsonify({
+                    "response": "Something went wrong. Contact the ZeroDown Support for help.",
+            }),500
 
 #HELPER METHODS
     def get_windows_volumes(hostname, username, port=22, key_filename=None):
@@ -258,6 +296,9 @@ class Zeroapi:
             client.connect(hostname=hostname, username=username, port=port, pkey=key)
 
             command="powershell.exe -command \" Get-WmiObject Win32_Volume | Select-Object DriveLetter, Capacity, FreeSpace | ConvertTo-Json\""
+            """Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, VolumeName, @{Label="Capacity (Bytes)";Expression={$_.Size}}, @{Label="Free Space (Bytes)";Expression={$_.FreeSpace}}"""
+            """(Get-ChildItem D:\ISO -force -Recurse -ErrorAction SilentlyContinue| measure Length -sum).sum / 1Gb"""
+            
             _, stdout, stderr = client.exec_command(command)
             output = stdout.read().decode('utf-8').strip()
             error = stderr.read().decode('utf-8').strip()
