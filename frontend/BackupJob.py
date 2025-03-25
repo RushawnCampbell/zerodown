@@ -1,4 +1,4 @@
-import customtkinter as gui, requests, tkinter as tk
+import customtkinter as gui, traceback, json, requests, tkinter as tk
 from PIL import Image
 from frontend.components.RemoteExplorer import RemoteExplorer
 
@@ -7,8 +7,9 @@ class BackupJob(gui.CTkFrame):
         super().__init__(master)
         self.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         self.create_widgets()
-        self.backup_demand =  float('inf')
-        self.directory_listing = {}
+        self.backup_demand =  0.00
+        self.volumes_with_size = {}
+        self.volumes = []
         self.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
         self.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
 
@@ -126,30 +127,37 @@ class BackupJob(gui.CTkFrame):
             self.browse_items_button.configure(text="Browse", state="disabled", fg_color="#2b2b2b")
 
     def get_listing(self, endpoint_name):
-        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/listing/{endpoint_name.lower()}"
+        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/endpoint/listing/{endpoint_name.lower()}"
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
         del zauth_token
         try:
             response = requests.get( resource_url, stream=True, headers=zeroheaders)
             response.raise_for_status()
-            directory_listing = response.json()
-            self.directory_listing= directory_listing
+            self.volumes_with_size = json.loads(response.json())
+            for obj in self.volumes_with_size:
+                self.volumes.append(obj)
         except requests.exceptions.RequestException as e:
             tk.messagebox.showerror("Fetch Error", f"Failed to fetch {e}")
             #return -1
         except Exception as e:
             print("ERROR IS",e)
+            tb = traceback.extract_tb(e.__traceback__)
+            last_frame = tb[-1]
+            if tb:
+                lineno = last_frame.lineno
+                print("LINE NUM IS", lineno)
             tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
             #return -1
     
     def select_storage_node(self):
-        print(self.directory_listing)
+        print(self.volumes)
 
     def browse_object(self):
         endpoint_name=self.endpoint_dropdown.get()
         title = f'{self.browse_items_button.cget("text")} on {endpoint_name}'
         self.get_listing(endpoint_name)
         RemoteExplorer(self, title, endpoint_name)
+        
 
         
