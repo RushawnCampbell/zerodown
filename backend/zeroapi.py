@@ -190,7 +190,16 @@ class Zeroapi:
                             "names" : endpoint_names
                         })
                     if object_type == "storagenodes":
-                        pass
+                        print("I AM HERE")
+                        fetched_storage_nodes = StorageNode.query.all()
+                        storage_node_names = []
+                        for storage_node in fetched_storage_nodes:
+                            #storage_node.append((storage_node.id,storage_node.name))
+                            storage_node_names.append(storage_node.name)
+
+                        return jsonify({
+                            "names" : storage_node_names
+                        })
                     return jsonify({"message": "Hello"})
                 except Exception as e:
                     return jsonify({
@@ -250,6 +259,52 @@ class Zeroapi:
             return jsonify({
                     "response": "Something went wrong. Contact the ZeroDown Support for help.",
             }),500
+        
+
+    @app.route('/zeroapi/v1/storage/volumes/<storage_name>', methods=['GET'])
+    def volumes(storage_name):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+
+                fetched_storage= StorageNode.query.filter_by(name=storage_name).first()
+                logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+                try:
+                    zcryptobj= ZeroCryptor()
+                    encrypted_hostname= fetched_storage.ip
+                    hostname = zcryptobj._decrypt_data(encrypted_data=encrypted_hostname, type="STORAGE")
+                    username= fetched_storage.username
+                    pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+                    client = paramiko.SSHClient()
+                    client.load_system_host_keys()
+                    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                    client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
+                    command= r"""$Volumes = Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, DeviceID, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}}; $Output = @{}; foreach ($Volume in $Volumes) { if ($Volume.DriveLetter) { $Output[$Volume.DriveLetter] = @{"DeviceID" = $Volume.DeviceID; "UsedSpaceGB" = $Volume.UsedSpaceGB} } }; $Output | ConvertTo-Json -Depth 5"""
+                    _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+                    vol_dict= stdout.read().decode('utf-8').strip()
+                    error = stderr.read().decode('utf-8').strip()
+                    client.close()
+                    if not error:
+                        print(vol_dict)
+                        return jsonify(vol_dict),200
+                    else:
+                        return jsonify({"response": "nothing found or an error occurred"}),401
+                except Exception as e:
+                    print(e)
+                    return jsonify({
+                        "response": "Something went wrong. Contact the ZeroDown Support for help.",
+                    }),500
+        except Exception as e:
+            print(e)
+            return jsonify({
+                    "response": "Something went wrong. Contact the ZeroDown Support for help.",
+            }),500
+
 
     @app.route('/zeroapi/v1/endpoint/backupdemand/<endpoint_name>', methods=['POST'])
     def backupdemand(endpoint_name):

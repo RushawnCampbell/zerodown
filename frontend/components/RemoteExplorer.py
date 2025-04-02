@@ -110,14 +110,22 @@ class RemoteExplorer(Popup):
         self.grid_rowconfigure(1, weight=0)
 
     def cancel_selection(self):
+        self.master.volumes = []
+        #self.master.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
+        #self.master.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         self.on_close()
 
     def continue_selection(self):
         #self.master.volumes = self.checked_items
-        for drives,size in self.checked_items['Volumes'].items():
+        for drive,size in self.checked_items['Volumes'].items():
+            print("DRIVE", drive, "SIZE", size)
             self.master.backup_demand += size
         print("DEMAND IS", self.master.backup_demand)
-        self.master.browse_destination_button.configure(state='normal', fg_color="#1F6AA5")
+        #self.master.browse_destination_button.configure(state='normal', fg_color="#1F6AA5")
+        self.master.storage_node_dropdown.configure(state="normal", fg_color= "#FFF", border_color="#FFF",  dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000")
+        self.master.volumes = []
+        #self.master.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
+        #self.master.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         self.on_close()
 
     def on_scrollbar_drive(self, *args):
