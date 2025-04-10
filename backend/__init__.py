@@ -6,9 +6,11 @@ from flask_session import Session
 
 from .config import Config
 from flask_compress import Compress
+from flask_caching import Cache
 
 app = Flask(__name__)
-
+cache = Cache(config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT':3600})
+cache.init_app(app)
 app.config.from_object(Config)
 
 app.config['SESSION_TYPE'] = 'sqlalchemy'

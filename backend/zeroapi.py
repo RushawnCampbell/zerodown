@@ -1,17 +1,20 @@
-from .  import app, db
+from .  import app, cache, db
 from flask import request, jsonify, send_file
 from werkzeug.security import check_password_hash
 from .Sqlmodels.User import User
 from .Sqlmodels.Endpoint import Endpoint
 from .Sqlmodels.StorageNode import StorageNode
 from .Sqlmodels.ZeroCryptor import ZeroCryptor
-import os, sys,jwt, logging, json, paramiko
+from .Sqlmodels.ESNPair import ESNPair
+import os, sys,jwt, logging, paramiko
 from datetime import datetime, timezone
+import time
+
 
 class Zeroapi:
-    #MAIN ROUTE METHODS
+#MAIN ROUTE METHODS
 
-    #Create User Administratively
+#Create User Administratively
     @app.route('/zeroapi/v1/adduser', methods=['GET'])
     def adduser():
         newuser  = User(first_name="Rushawn",last_name="Campbell",email="rushawn.campbell@mymona.uwi.edu", username="admin", password="admin123")
@@ -19,7 +22,6 @@ class Zeroapi:
         db.session.commit()
         print("status ok user added")
         return jsonify({"stat": "ok user added"})
-
     #LLog in User
     @app.route('/zeroapi/v1/login', methods=['POST'])
     def login():
@@ -28,16 +30,11 @@ class Zeroapi:
             data = request.get_json()
             uname = data.get('username')
             password = data.get('password')
-
             user = User.query.filter_by(username=uname).first()
             if user is not None and check_password_hash(user.password, password):
                 tokencreationtime = datetime.now(timezone.utc).strftime("%H:%M:%S")
                 token  = jwt.encode({'sub':uname,'initime': tokencreationtime}, app.config.get('SECRET_KEY'),algorithm='HS256')  
                 return jsonify({
-                    #"message": "Login Successful",
-                    #"first_name": user.first_name,
-                    #"last_name": user.last_name,
-                    #"user_id": user.user_id,
                     "zauth_token": token
                 }),200
             else:
@@ -159,7 +156,6 @@ class Zeroapi:
                     db.session.commit()
                     return jsonify({"message": "Storage Node Registered"}),200
             else:
-                print("WITHOUT EXCEPTION")
                 return jsonify({"message": "Access token is missing or invalid"}),401
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -183,14 +179,12 @@ class Zeroapi:
                         fetched_endpoints = Endpoint.query.all()
                         endpoint_names = []
                         for endpoint in fetched_endpoints:
-                            #endpoint_names.append((endpoint.id,endpoint.name))
                             endpoint_names.append(endpoint.name)
 
                         return jsonify({
                             "names" : endpoint_names
                         })
                     if object_type == "storagenodes":
-                        print("I AM HERE")
                         fetched_storage_nodes = StorageNode.query.all()
                         storage_node_names = []
                         for storage_node in fetched_storage_nodes:
@@ -221,6 +215,7 @@ class Zeroapi:
             if namepart == fetched_user.username.lower():
 
                 fetched_endpoint= Endpoint.query.filter_by(name=endpoint_name).first()
+                cache.set(f'{namepart}_current_endpoint', fetched_endpoint)
                 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
                 try:
                     zcryptobj= ZeroCryptor()
@@ -245,7 +240,6 @@ class Zeroapi:
                     error = stderr.read().decode('utf-8').strip()
                     client.close()
                     if not error:
-                        print(vol_dict)
                         return jsonify(vol_dict),200
                     else:
                         return jsonify({"response": "nothing found or an error occurred"}),401
@@ -273,6 +267,7 @@ class Zeroapi:
             if namepart == fetched_user.username.lower():
 
                 fetched_storage= StorageNode.query.filter_by(name=storage_name).first()
+                cache.set(f'{namepart}_current_storage_node', fetched_storage)
                 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
                 try:
                     zcryptobj= ZeroCryptor()
@@ -284,13 +279,12 @@ class Zeroapi:
                     client.load_system_host_keys()
                     client.set_missing_host_key_policy(paramiko.RejectPolicy())
                     client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
-                    command= r"""$Volumes = Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, DeviceID, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}}; $Output = @{}; foreach ($Volume in $Volumes) { if ($Volume.DriveLetter) { $Output[$Volume.DriveLetter] = @{"DeviceID" = $Volume.DeviceID; "UsedSpaceGB" = $Volume.UsedSpaceGB} } }; $Output | ConvertTo-Json -Depth 5"""
+                    command = r"""$Volumes = Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, DeviceID, @{Name='AvailableSpaceGB';Expression={[math]::Round(($_.FreeSpace) / 1GB, 2)}}; $Output = @{}; foreach ($Volume in $Volumes) { if ($Volume.DriveLetter) { $Output[$Volume.DriveLetter] = @{"DeviceID" = $Volume.DeviceID; "AvailableSpaceGB" = $Volume.AvailableSpaceGB} } }; $Output | ConvertTo-Json -Depth 5"""
                     _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
                     vol_dict= stdout.read().decode('utf-8').strip()
                     error = stderr.read().decode('utf-8').strip()
                     client.close()
                     if not error:
-                        print(vol_dict)
                         return jsonify(vol_dict),200
                     else:
                         return jsonify({"response": "nothing found or an error occurred"}),401
@@ -345,54 +339,134 @@ class Zeroapi:
                     "response": "Something went wrong. Contact the ZeroDown Support for help.",
             }),500
 
-#HELPER METHODS
-    def get_windows_volumes(hostname, username, port=22, key_filename=None):
+
+
+    @app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
+    def on_demand():
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
         try:
-            client = paramiko.SSHClient()
-            client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
 
+                fetched_endpoint= cache.get(f'{namepart}_current_endpoint')
+                fetched_storage = cache.get(f'{namepart}_current_storage_node')
 
-            logging.info(f"Using key file: {key_filename}")
-            key = paramiko.RSAKey.from_private_key_file(key_filename)
-            client.connect(hostname=hostname, username=username, port=port, pkey=key)
-
-            command="powershell.exe -command \" Get-WmiObject Win32_Volume | Select-Object DriveLetter, Capacity, FreeSpace | ConvertTo-Json\""
-            """Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, VolumeName, @{Label="Capacity (Bytes)";Expression={$_.Size}}, @{Label="Free Space (Bytes)";Expression={$_.FreeSpace}}"""
-            """(Get-ChildItem D:\ISO -force -Recurse -ErrorAction SilentlyContinue| measure Length -sum).sum / 1Gb"""
-            
-            _, stdout, stderr = client.exec_command(command)
-            output = stdout.read().decode('utf-8').strip()
-            error = stderr.read().decode('utf-8').strip()
-
-            if error:
-                logging.error(f"Error executing command: {error}")
-                return None
-
-            try:
-                volume_data = [json.loads(output)]
-            except json.JSONDecodeError as e:
-                logging.error(f"Error decoding JSON: {e}. Output: {output}")
-                return None
-
-            volumes = {}
-            for volume in volume_data:
-                drive_letter = volume.get('DriveLetter')
-                if drive_letter:
-                    total_space = int(volume.get('Capacity', 0))
-                    free_space = int(volume.get('FreeSpace', 0))
-                    volumes[drive_letter] = {"total": total_space, "free": free_space}
-            return volumes
-
-        except paramiko.AuthenticationException:
-            logging.error("Authentication failed.")
-            return None
-        except paramiko.SSHException as e:
-            logging.error(f"SSH connection failed: {e}")
-            return None
+                logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+                try:
+                    zcryptobj= ZeroCryptor()
+                    storage_node_pub_key = fetched_storage.pub_key
+                    storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=storage_node_pub_key, type="STORAGE")
+                    storage_node_ip = fetched_storage.ip
+                    storage_node_ip = zcryptobj._decrypt_data(encrypted_data=storage_node_ip, type="STORAGE")
+                    storage_node_username = fetched_storage.username
+                    endpoint_ip= fetched_endpoint.ip
+                    endpoint_ip= zcryptobj._decrypt_data(encrypted_data=endpoint_ip, type="ENDPOINT")
+                    endpoint_username = fetched_endpoint.username
+                    storage_client, pairing_sftp_exit_code= Zeroapi.PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username)
+                
+                    if pairing_sftp_exit_code == 0:
+                        espnobj = ESNPair(storage_node_id = fetched_storage.id , endpoint_id= fetched_endpoint.id )
+                        db.session.add(espnobj)
+                        db.session.commit()
+                        remote_folder = f"C:\\Users\\{endpoint_username}"
+                        local_folder = "D:\\"
+                        sftp_commands = [
+                            f'get -r {remote_folder} {local_folder}',
+                            'bye'
+                        ]
+                        output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
+                        
+                        
+                        if backup_exit_code == 0:
+                            print("SFTP Output:", output)
+                            if error_output:
+                                print("SFTP Standard Error:", error_output)
+                            storage_client.close()
+                            return jsonify({"response":  pairing_sftp_exit_code}),200
+                        else:
+                            print("Remote SFTP failed. Exit code:", backup_exit_code)
+                            if error_output:
+                                print("SFTP Standard Error:", error_output)
+                            storage_client.close()
+                            return jsonify({"response":  backup_exit_code}),500
+                    else:
+                        return jsonify({"response":  pairing_sftp_exit_code}),500
+                except Exception as e:
+                    print(e)
+                    return jsonify({"response": -1}),500
         except Exception as e:
-            logging.exception("An unexpected error occurred:")
-            return None
-        finally:
-            if 'client' in locals() and client:
-                client.close()
+            print(e)
+            return jsonify({"response":  -1}),500
+
+    #UTILITY FUNCTIONS
+    
+    @staticmethod
+    def run_backup(storage_client, endpoint_username, endpoint_ip, commands):
+        """Runs SFTP commands on the target machine through the intermediary."""
+        try:
+            command = f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
+            stdin, stdout, stderr = storage_client.exec_command(command)
+
+            output = ""
+            error_output = ""
+            for cmd in commands:
+                stdin.write(cmd + "\n")
+                stdin.flush()
+                time.sleep(0.1)  
+
+            #stdin.write("bye\n")  
+            #stdin.flush()
+            stdin.close()  
+
+            while not stdout.channel.exit_status_ready():
+                if stdout.channel.recv_ready():
+                    output += stdout.read().decode()
+                if stderr.channel.recv_ready():
+                    error_output += stderr.read().decode()
+                time.sleep(0.1)
+
+            exit_code = stdout.channel.recv_exit_status()
+            print("ERROR IS", error_output )
+            print("EXIT IS", exit_code )
+            print("OUTPUT IS", output )
+            storage_client.close()
+            return output, error_output, exit_code
+
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            print(f"Error running remote SFTP: {e}", "LINE NUMBER IS", line_number)
+            return None, None, -1
+    
+    @staticmethod
+    def PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username):
+        pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+        endpoint_client = paramiko.SSHClient()
+        endpoint_client.load_system_host_keys()
+        endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
+        command = f'Add-Content -Path "$env:USERPROFILE\\.ssh\\authorized_keys" -Value \\"`n{storage_node_pub_key}\\"'
+        _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+        error = stderr.read().decode('utf-8').strip()
+        endpoint_client.close()
+        if not error:
+            storage_client = paramiko.SSHClient()
+            storage_client.load_system_host_keys()
+            storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            storage_client.connect(hostname=storage_node_ip, username=storage_node_username, port=22, pkey=pkey)
+            command =  f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
+            stdin, stdout, stderr = storage_client.exec_command(command)
+            stdin.write("bye\n")
+            stdin.flush()
+            stdin.close()
+            error = stderr.read().decode().strip()
+            output = stdout.read().decode().strip()
+            sftp_exit_code = stdout.channel.recv_exit_status()
+            
+            return storage_client,sftp_exit_code
+        else:
+            return _, -1

@@ -3,21 +3,27 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 import customtkinter as gui
-from flask import jsonify
-import requests
 
 class RemoteExplorer(Popup):
-    def __init__(self, master, title, endpoint_name):
+    def __init__(self, master, title, object_name, object_type, operation):
         super().__init__(master, title)
         self.master = master
-        self.endpoint_name = endpoint_name
+        self.object_name = object_name
+        self.object_type = object_type
+        self.operation = operation
         self.configure(fg_color="#2B2B2B")
         self.after(500, self.custom_set_pos)
         self.checkbox_vars = {}
         self.checked_items = {}
         self.load_checkbox_images()
-        self.create_three_column_layout()
+        self.create_two_column_layout()
         self.create_bottom_buttons()
+
+        if self.object_type == "storage" and self.operation == "backup":
+            self.vm_frame.grid_forget()
+            self.grid_columnconfigure(1, weight=0) # remove second column weight
+            self.grid_columnconfigure(0, weight=1) # force first column to take full width
+            self.vol_frame.grid(columnspan=2) # make volume frame span both columns
 
     def custom_set_pos(self):
         self.set_window_position(900, 450)
@@ -38,15 +44,14 @@ class RemoteExplorer(Popup):
         self.checked_image = ImageTk.PhotoImage(checked_image)
         self.unchecked_image = ImageTk.PhotoImage(unchecked_image)
 
-    def create_three_column_layout(self):
+    def create_two_column_layout(self):  # Modified to two columns
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         # Column 1: Volume Tree
         self.vol_frame = gui.CTkFrame(self)
-        self.vol_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew") # Changed column to 0
+        self.vol_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.vol_frame.grid_columnconfigure(0, weight=1)
         self.vol_frame.grid_rowconfigure(0, weight=1)
 
@@ -63,7 +68,7 @@ class RemoteExplorer(Popup):
 
         # Column 2: Virtual Machines Tree
         self.vm_frame = gui.CTkFrame(self)
-        self.vm_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew") # Changed column to 1
+        self.vm_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.vm_frame.grid_columnconfigure(0, weight=1)
         self.vm_frame.grid_rowconfigure(0, weight=1)
 
@@ -78,26 +83,9 @@ class RemoteExplorer(Popup):
         self.build_vm_tree()
         self.vm_tree.bind("<Button-1>", self.on_tree_click)
 
-        # Column 3: Applications Tree
-        self.app_frame = gui.CTkFrame(self)
-        self.app_frame.grid(row=0, column=2, padx=10, pady=10, sticky="nsew") # Changed column to 2
-        self.app_frame.grid_columnconfigure(0, weight=1)
-        self.app_frame.grid_rowconfigure(0, weight=1)
-
-        self.app_tree = ttk.Treeview(master=self.app_frame, show="tree headings")
-        self.app_tree.grid(row=0, column=0, sticky="nsew")
-
-        self.app_scrollbar = gui.CTkScrollbar(master=self.app_frame, orientation="vertical", command=self.app_tree.yview)
-        self.app_scrollbar.grid(row=0, column=1, sticky="ns")
-
-        self.app_tree.configure(yscrollcommand=self.app_scrollbar.set)
-        self.app_tree.heading("#0", text="Applications", anchor="w")
-        self.build_app_tree()
-        self.app_tree.bind("<Button-1>", self.on_tree_click)
-
     def create_bottom_buttons(self):
         self.button_frame = gui.CTkFrame(self)
-        self.button_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=10, sticky="ew")
+        self.button_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="ew")  # Modified columnspan
         self.button_frame.grid_columnconfigure(0, weight=1)
         self.button_frame.grid_columnconfigure(1, weight=1)
 
@@ -111,25 +99,28 @@ class RemoteExplorer(Popup):
 
     def cancel_selection(self):
         self.master.volumes = []
-        #self.master.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
-        #self.master.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         self.on_close()
 
     def continue_selection(self):
-        #self.master.volumes = self.checked_items
-        for drive,size in self.checked_items['Volumes'].items():
-            print("DRIVE", drive, "SIZE", size)
-            self.master.backup_demand += size
-        print("DEMAND IS", self.master.backup_demand)
-        #self.master.browse_destination_button.configure(state='normal', fg_color="#1F6AA5")
-        self.master.storage_node_dropdown.configure(state="normal", fg_color= "#FFF", border_color="#FFF",  dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000")
+        if self.object_type == 'endpoint':
+            for drive, size in self.checked_items['Volumes'].items():
+                self.master.backup_demand += size
+                self.master.selected_endpoint_info = self.checked_items
+                self.master.storage_node_dropdown.configure(state="normal", fg_color="#FFF", border_color="#FFF", dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000")
+                print("CHECKED ENDPOINT VOLUME",  self.master.selected_endpoint_info)
+            
+        elif self.object_type == 'storage':
+            for drive, size in self.checked_items['Volumes'].items():
+                self.master.available_storage_size += size
+                self.master.schedule_backup_button.configure(state="normal", fg_color="#1F6AA5")
+                self.master.backup_now_button.configure(state="normal", fg_color="#1fa59d")
+                self.master.selected_storage_info = self.checked_items
+                print("CHECKED STORAGE",  self.master.selected_storage_info)
         self.master.volumes = []
-        #self.master.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
-        #self.master.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
         self.on_close()
 
     def on_scrollbar_drive(self, *args):
-        pass # Removed as it seems unused in the current context
+        pass
 
     def build_vol_tree(self):
         root = self.vol_tree.insert("", "end", text="Volumes", open=True)
@@ -143,13 +134,6 @@ class RemoteExplorer(Popup):
         if hasattr(self.master, 'virtual_machines') and self.master.virtual_machines:
             for vm in self.master.virtual_machines:
                 item = self.vm_tree.insert(root, "end", text=vm, image=self.unchecked_image)
-                self.checkbox_vars[item] = tk.BooleanVar(value=False)
-
-    def build_app_tree(self):
-        root = self.app_tree.insert("", "end", text="Applications", open=True)
-        if hasattr(self.master, 'applications') and self.master.applications:
-            for app in self.master.applications:
-                item = self.app_tree.insert(root, "end", text=app, image=self.unchecked_image)
                 self.checkbox_vars[item] = tk.BooleanVar(value=False)
 
     def on_tree_click(self, event):
@@ -170,15 +154,17 @@ class RemoteExplorer(Popup):
                 if tree == self.vol_tree:
                     if "Volumes" not in self.checked_items:
                         self.checked_items["Volumes"] = {}
-                    self.checked_items["Volumes"][item_text] = self.master.volumes_with_size[item_text]['UsedSpaceGB']
+
+                    if self.object_type == "endpoint":
+                        self.checked_items["Volumes"][item_text] = self.master.volumes_with_size[item_text]['UsedSpaceGB']
+
+                    if self.object_type == "storage":
+                        self.checked_items["Volumes"][item_text] = self.master.volumes_with_size[item_text]['AvailableSpaceGB']
+                    
                 elif tree == self.vm_tree:
                     if "Virtual Machines" not in self.checked_items:
                         self.checked_items["Virtual Machines"] = {}
                     self.checked_items["Virtual Machines"][item_text] = 0
-                elif tree == self.app_tree:
-                    if "Applications" not in self.checked_items:
-                        self.checked_items["Applications"] = {}
-                    self.checked_items["Applications"][item_text] = 0
             else:
                 tree.item(item, image=self.unchecked_image)
                 item_text = tree.item(item, "text")
@@ -193,15 +179,9 @@ class RemoteExplorer(Popup):
                         del self.checked_items["Virtual Machines"][item_text]
                         if not self.checked_items["Virtual Machines"]:
                             del self.checked_items["Virtual Machines"]
-                elif tree == self.app_tree:
-                    if "Applications" in self.checked_items and item_text in self.checked_items["Applications"]:
-                        del self.checked_items["Applications"][item_text]
-                        if not self.checked_items["Applications"]:
-                            del self.checked_items["Applications"]
 
             self.vol_tree.update_idletasks()
             self.vm_tree.update_idletasks()
-            self.app_tree.update_idletasks()
 
     def on_single_click(self, event):
         pass
