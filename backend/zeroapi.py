@@ -6,13 +6,18 @@ from .Sqlmodels.Endpoint import Endpoint
 from .Sqlmodels.StorageNode import StorageNode
 from .Sqlmodels.ZeroCryptor import ZeroCryptor
 from .Sqlmodels.ESNPair import ESNPair
-import os, sys,jwt, logging, paramiko
+from .Sqlmodels.BackupJob import BackupJob
+import os, sys,jwt, logging, paramiko, uuid
 from datetime import datetime, timezone
 import time
+import threading
 
 
 class Zeroapi:
-#MAIN ROUTE METHODS
+    backup_in_progress = 0
+    backup_with_errors = {}
+    backup_with_success = {}
+#MAIN ROUTE METHOD
 
 #Create User Administratively
     @app.route('/zeroapi/v1/adduser', methods=['GET'])
@@ -227,13 +232,6 @@ class Zeroapi:
                     client.load_system_host_keys()
                     client.set_missing_host_key_policy(paramiko.RejectPolicy())
                     client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
-                    #command= 'Get-WmiObject Win32_Volume | ForEach-Object {$DriveLetter=$_.DriveLetter; if ($DriveLetter) {Get-ChildItem -Path "$DriveLetter\" -Directory -Recurse -Force | Select-Object -ExpandProperty FullName | ForEach-Object {$_}}} | Out-String -Stream | ForEach-Object {$_.TrimEnd()}'
-                    #command = 'Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType > 0" | ForEach-Object {$Volume=$_.DeviceID;$DriveType=$_.DriveType;$DriveTypeString=switch ($DriveType) {0 {"Unknown"} 1 {"No Root Directory"} 2 {"Removable"} 3 {"Local Disk"} 4 {"Network"} 5 {"CD-ROM"} 6 {"RAM Disk"} default {"Other ($DriveType)"}};$TotalSizeGB=[Math]::Round($_.Size / 1GB, 2);$FreeSpaceGB=[Math]::Round($_.FreeSpace / 1GB, 2);$UsedSpaceGB=[Math]::Round(($_.Size - $_.FreeSpace) / 1GB, 2);"$Volume $UsedSpaceGB"} | Out-String -Stream | ForEach-Object {$_.TrimEnd()}'
-                    #command='Get-WmiObject Win32_Volume | Select-Object DriveLetter, Capacity, FreeSpace | ConvertTo-Json'
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='UsedSpace';Expression={$_.Capacity - $_.FreeSpace}} | ConvertTo-Json"
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}} | ConvertTo-Json"
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='DeviceID';Expression={$_.DeviceID}}, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}} | ConvertTo-Json"
-                    #command =r"Get-CimInstance -ClassName Win32_Volume | Select-Object @{Name='DriveLetter';Expression={$_.DriveLetter}}, @{Name='DeviceID';Expression={$_.DeviceID}}, @{Name='SizeGB';Expression={[math]::Round($_.Capacity / 1GB, 2)}} | ConvertTo-Json"
                     command= r"""$Volumes = Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, DeviceID, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}}; $Output = @{}; foreach ($Volume in $Volumes) { if ($Volume.DriveLetter) { $Output[$Volume.DriveLetter] = @{"DeviceID" = $Volume.DeviceID; "UsedSpaceGB" = $Volume.UsedSpaceGB} } }; $Output | ConvertTo-Json -Depth 5"""
                     _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
                     vol_dict= stdout.read().decode('utf-8').strip()
@@ -340,9 +338,8 @@ class Zeroapi:
             }),500
 
 
-
-    @app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
-    def on_demand():
+    @app.route('/zeroapi/v1/backup/restore', methods=['POST'])
+    def restore():
         user_token= request.headers['Authorization'].split(' ')[1]
         if not user_token:
             return jsonify({"message": "Access token is missing or invalid"}),401
@@ -351,62 +348,108 @@ class Zeroapi:
             namepart= decoded['sub'].lower()
             fetched_user = User.query.filter_by(username=namepart).first()
             if namepart == fetched_user.username.lower():
-
-                fetched_endpoint= cache.get(f'{namepart}_current_endpoint')
-                fetched_storage = cache.get(f'{namepart}_current_storage_node')
-
-                logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-                try:
-                    zcryptobj= ZeroCryptor()
-                    storage_node_pub_key = fetched_storage.pub_key
-                    storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=storage_node_pub_key, type="STORAGE")
-                    storage_node_ip = fetched_storage.ip
-                    storage_node_ip = zcryptobj._decrypt_data(encrypted_data=storage_node_ip, type="STORAGE")
-                    storage_node_username = fetched_storage.username
-                    endpoint_ip= fetched_endpoint.ip
-                    endpoint_ip= zcryptobj._decrypt_data(encrypted_data=endpoint_ip, type="ENDPOINT")
-                    endpoint_username = fetched_endpoint.username
-                    storage_client, pairing_sftp_exit_code= Zeroapi.PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username)
-                
-                    if pairing_sftp_exit_code == 0:
-                        espnobj = ESNPair(storage_node_id = fetched_storage.id , endpoint_id= fetched_endpoint.id )
-                        db.session.add(espnobj)
-                        db.session.commit()
-                        remote_folder = f"C:\\Users\\{endpoint_username}"
-                        local_folder = "D:\\"
-                        sftp_commands = [
-                            f'get -r {remote_folder} {local_folder}',
-                            'bye'
-                        ]
-                        output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
-                        
-                        
-                        if backup_exit_code == 0:
-                            print("SFTP Output:", output)
-                            if error_output:
-                                print("SFTP Standard Error:", error_output)
-                            storage_client.close()
-                            return jsonify({"response":  pairing_sftp_exit_code}),200
-                        else:
-                            print("Remote SFTP failed. Exit code:", backup_exit_code)
-                            if error_output:
-                                print("SFTP Standard Error:", error_output)
-                            storage_client.close()
-                            return jsonify({"response":  backup_exit_code}),500
-                    else:
-                        return jsonify({"response":  pairing_sftp_exit_code}),500
-                except Exception as e:
-                    print(e)
-                    return jsonify({"response": -1}),500
+                pass
         except Exception as e:
             print(e)
             return jsonify({"response":  -1}),500
+        
+
+    @app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
+    def on_demand():
+        user_token = request.headers.get('Authorization', '').split(' ')[-1]
+        if not user_token:
+            return jsonify({"response": -1}),500
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart = decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart != fetched_user.username.lower():
+                return jsonify({"response": -1}),500
+    
+            fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
+            fetched_storage = cache.get(f'{namepart}_current_storage_node')
+    
+            zcryptobj = ZeroCryptor()
+            storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
+            storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
+            storage_node_username = fetched_storage.username
+            endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")
+            endpoint_username = fetched_endpoint.username
+            storage_client, pairing_sftp_exit_code = Zeroapi.PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username)
+    
+            if pairing_sftp_exit_code != 0:
+                return jsonify({"response": pairing_sftp_exit_code}), 500
+    
+            esnpair_id = str(uuid.uuid4())
+            espnobj = ESNPair( storage_node_id=fetched_storage.id, endpoint_id=fetched_endpoint.id, id=esnpair_id)
+            db.session.add(espnobj)
+            db.session.commit()
+    
+            data = request.get_json()
+            selected_storage_volumes = data.get('backup_destinations')
+            remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
+            job_id = str(uuid.uuid4())
+    
+            def handle_sftp_result(output, error_output, backup_exit_code):
+                if backup_exit_code == 0 and not error_output:
+                    return backup_exit_code
+                else:
+                    print(f"Remote SFTP failed. Exit code: {backup_exit_code}, Error: {error_output}")
+                    return -1
+    
+            def run_backup_thread():
+                if "Volumes" in selected_storage_volumes:
+                    selected_storage_volumes_list = selected_storage_volumes['Volumes'].keys()
+                    for vol in selected_storage_volumes_list:
+                        backup_destination = f'{vol}\\'
+                        sftp_commands = [
+                            f'get -r {remote_folder} {backup_destination}',
+                            'bye'
+                        ]
+                        output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
+                        result = handle_sftp_result(output, error_output, backup_exit_code)
+                        
+                        if result == 0:
+                            if job_id in Zeroapi.backup_with_success:
+                                Zeroapi.backup_with_success[job_id].append(vol)
+                            else:
+                                Zeroapi.backup_with_success[job_id] = [vol]
+                        else:
+                            if job_id in Zeroapi.backup_with_errors:
+                                Zeroapi.backup_with_errors[job_id].append(vol)
+                            else:
+                                Zeroapi.backup_with_errors[job_id] = [vol]
+
+                    storage_client.close()
+            threading.Thread(target=run_backup_thread).start()
+            job_name = data.get('name')
+            backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
+            db.session.add(backupjob)
+            db.session.commit()
+            return jsonify({"in_progress": len(selected_storage_volumes), "job_id":job_id }), 200
+    
+        except Exception as e:
+            print("ERROR IS", e)
+            return jsonify({"in_progress": -1}),500
+        
+    @app.route('/zeroapi/v1/backup/get_status', methods=['POST'])
+    def get_status():
+        user_token = request.headers.get('Authorization', '').split(' ')[-1]
+        if not user_token:
+            return jsonify({"response": -1}),500
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart = decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart != fetched_user.username.lower():
+                pass
+        except Exception as e:
+            print("ERROR IS", e)
+            return jsonify({"in_progress": -1}),500
 
     #UTILITY FUNCTIONS
-    
     @staticmethod
     def run_backup(storage_client, endpoint_username, endpoint_ip, commands):
-        """Runs SFTP commands on the target machine through the intermediary."""
         try:
             command = f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
             stdin, stdout, stderr = storage_client.exec_command(command)
@@ -418,8 +461,6 @@ class Zeroapi:
                 stdin.flush()
                 time.sleep(0.1)  
 
-            #stdin.write("bye\n")  
-            #stdin.flush()
             stdin.close()  
 
             while not stdout.channel.exit_status_ready():
@@ -430,9 +471,6 @@ class Zeroapi:
                 time.sleep(0.1)
 
             exit_code = stdout.channel.recv_exit_status()
-            print("ERROR IS", error_output )
-            print("EXIT IS", exit_code )
-            print("OUTPUT IS", output )
             storage_client.close()
             return output, error_output, exit_code
 

@@ -3,7 +3,6 @@ from  .. import db
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from .ZeroCryptor import ZeroCryptor
 
 class ESNPair(db.Model):
     __tablename__ = 'esnpair'
@@ -16,6 +15,7 @@ class ESNPair(db.Model):
     storage_node = relationship("StorageNode", backref="pairings")
     endpoint = relationship("Endpoint", backref="pairings")
 
-    def __init__(self, storage_node_id, endpoint_id):
+    def __init__(self, storage_node_id, endpoint_id, id=lambda: str(uuid.uuid4())):
+        self.id=id
         self.storage_node_id = storage_node_id
         self.endpoint_id = endpoint_id

@@ -1069,3 +1069,84 @@ if __name__ == "__main__":
     configure_rclone_and_execute(machine_b_ip, machine_b_user,
                                 machine_c_ip, machine_c_user,
                                 machine_c_remote_path, machine_b_local_path)
+
+
+
+
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+@app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
+async def on_demand():
+    user_token = request.headers.get('Authorization', '').split(' ')[-1]
+    if not user_token:
+        return jsonify({"message": "Access token is missing or invalid"}), 401
+
+    try:
+        decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        namepart = decoded['sub'].lower()
+        fetched_user = User.query.filter_by(username=namepart).first()
+        if namepart != fetched_user.username.lower():
+            return jsonify({"message": "Invalid user"}), 401
+
+        fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
+        fetched_storage = cache.get(f'{namepart}_current_storage_node')
+
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        zcryptobj = ZeroCryptor()
+        storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
+        storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
+        storage_node_username = fetched_storage.username
+        endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")
+        endpoint_username = fetched_endpoint.username
+
+        storage_conn_id, pairing_sftp_exit_code = await Zeroapi.pair_esn(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username)
+        if pairing_sftp_exit_code != 0:
+            return jsonify({"response": pairing_sftp_exit_code}), 500
+
+        espnobj = ESNPair(storage_node_id=fetched_storage.id, endpoint_id=fetched_endpoint.id)
+        db.session.add(espnobj)
+        db.session.commit()
+
+        data = request.get_json()
+        selected_storage_volumes = data.get('backup_destination')
+        remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
+
+        if "Volumes" in selected_storage_volumes:
+            selected_storage_volumes = selected_storage_volumes['Volumes'].keys()
+
+            async def run_sftp_in_thread(vol):
+                backup_destination = f'{vol}\\'
+                sftp_commands = [
+                    f'get -r {remote_folder} {backup_destination}',
+                    'bye'
+                ]
+                output, error_output, backup_exit_code = await Zeroapi.run_remote_sftp(storage_conn_id, endpoint_username, endpoint_ip, sftp_commands)
+
+                return backup_exit_code, error_output
+
+            async def process_volumes():
+                tasks = [run_sftp_in_thread(vol) for vol in selected_storage_volumes]
+                results = await asyncio.gather(*tasks)
+                return results
+
+            results = await process_volumes()
+            Zeroapi.ssh_connection_pool.close_connection(storage_conn_id)
+
+            for backup_exit_code, error_output in results:
+                if backup_exit_code != 0:
+                    print("Remote SFTP failed. Exit code:", backup_exit_code)
+                    if error_output:
+                        print("SFTP Standard Error:", error_output)
+                    return jsonify({"response": backup_exit_code}), 500
+
+            return jsonify({"response": 0}), 200
+
+        else:
+            Zeroapi.ssh_connection_pool.close_connection(storage_conn_id)
+            return jsonify({"response": 0}), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({"response": -1}), 500

@@ -1,6 +1,7 @@
 import customtkinter as gui, traceback, json, requests, tkinter as tk
 from PIL import Image
 from frontend.components.RemoteExplorer import RemoteExplorer
+from frontend.components.JobStatus import JobStatus
 
 class BackupJob(gui.CTkFrame):
     def __init__(self, master):
@@ -9,6 +10,7 @@ class BackupJob(gui.CTkFrame):
         self.endpoint_name = None
         self.storage_node_dropdown = None
         self.selected_storage = None
+        self.backup_job_name =None
         self.create_widgets()
         self.backup_demand =  0.00
         self.available_storage_size = 0.00
@@ -32,11 +34,11 @@ class BackupJob(gui.CTkFrame):
         self.form_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=40, pady=20)
 
         # Row 1: Backup Description, Endpoint
-        description_label = gui.CTkLabel(self.form_frame, text="Backup Description")
-        description_label.grid(row=0, column=0, padx=(20, 5), pady=(20, 5), sticky="w")
+        backup_job_label = gui.CTkLabel(self.form_frame, text="Backup Job Name")
+        backup_job_label.grid(row=0, column=0, padx=(20, 5), pady=(20, 5), sticky="w")
 
-        self.description_entry = gui.CTkEntry(self.form_frame, fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000")
-        self.description_entry.grid(row=1, column=0, padx=(20, 5), pady=(5, 5), sticky="ew")
+        self.backup_job_name = gui.CTkEntry(self.form_frame, fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000")
+        self.backup_job_name.grid(row=1, column=0, padx=(20, 5), pady=(5, 5), sticky="ew")
 
         endpoint_label = gui.CTkLabel(self.form_frame, text="Select Endpoint")
         endpoint_label.grid(row=0, column=1, padx=(5, 20), pady=(20, 5), sticky="w")
@@ -200,18 +202,20 @@ class BackupJob(gui.CTkFrame):
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
         try:
-            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_item": self.selected_endpoint_info, "backup_destination": self.selected_storage_info })
+            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_targets": self.selected_endpoint_info, "backup_destinations": self.selected_storage_info, "name": self.backup_job_name.get()})
             response.raise_for_status()
             response= response.json()
-            sftp_exit_code = response['response']
+            in_progress_num = response['in_progress']
+            job_id = response['job_id']
 
-            if sftp_exit_code == 0:
-                print("SFTP TESTED SUCCESSFULLY")
+            if  in_progress_num >= 1:
+                title = f"Backup Job: {self.backup_job_name.get()} In Progress"
+                JobStatus(self, title, in_progress_num, job_id )
             else:
-                print("SFTP FAILED")
+                tk.messagebox.showerror("Backup Error", f"Something Went Wrong: Failed to start backup")
 
         except requests.exceptions.RequestException as e:
-            tk.messagebox.showerror("Backup Error", f"Failed to create backup {e}")
+            tk.messagebox.showerror("Backup Error", f"An unexpected error occurred. Please try again or contact ZeroDown Support for help.")
 
         
     def schedule_backup(self):

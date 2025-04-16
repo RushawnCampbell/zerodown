@@ -227,13 +227,6 @@ class Zeroapi:
                     client.load_system_host_keys()
                     client.set_missing_host_key_policy(paramiko.RejectPolicy())
                     client.connect(hostname=hostname, username=username, port=22, pkey=pkey)
-                    #command= 'Get-WmiObject Win32_Volume | ForEach-Object {$DriveLetter=$_.DriveLetter; if ($DriveLetter) {Get-ChildItem -Path "$DriveLetter\" -Directory -Recurse -Force | Select-Object -ExpandProperty FullName | ForEach-Object {$_}}} | Out-String -Stream | ForEach-Object {$_.TrimEnd()}'
-                    #command = 'Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType > 0" | ForEach-Object {$Volume=$_.DeviceID;$DriveType=$_.DriveType;$DriveTypeString=switch ($DriveType) {0 {"Unknown"} 1 {"No Root Directory"} 2 {"Removable"} 3 {"Local Disk"} 4 {"Network"} 5 {"CD-ROM"} 6 {"RAM Disk"} default {"Other ($DriveType)"}};$TotalSizeGB=[Math]::Round($_.Size / 1GB, 2);$FreeSpaceGB=[Math]::Round($_.FreeSpace / 1GB, 2);$UsedSpaceGB=[Math]::Round(($_.Size - $_.FreeSpace) / 1GB, 2);"$Volume $UsedSpaceGB"} | Out-String -Stream | ForEach-Object {$_.TrimEnd()}'
-                    #command='Get-WmiObject Win32_Volume | Select-Object DriveLetter, Capacity, FreeSpace | ConvertTo-Json'
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='UsedSpace';Expression={$_.Capacity - $_.FreeSpace}} | ConvertTo-Json"
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}} | ConvertTo-Json"
-                    #command= r"Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, @{Name='DeviceID';Expression={$_.DeviceID}}, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}} | ConvertTo-Json"
-                    #command =r"Get-CimInstance -ClassName Win32_Volume | Select-Object @{Name='DriveLetter';Expression={$_.DriveLetter}}, @{Name='DeviceID';Expression={$_.DeviceID}}, @{Name='SizeGB';Expression={[math]::Round($_.Capacity / 1GB, 2)}} | ConvertTo-Json"
                     command= r"""$Volumes = Get-CimInstance -ClassName Win32_Volume | Select-Object DriveLetter, DeviceID, @{Name='UsedSpaceGB';Expression={[math]::Round(($_.Capacity - $_.FreeSpace) / 1GB, 2)}}; $Output = @{}; foreach ($Volume in $Volumes) { if ($Volume.DriveLetter) { $Output[$Volume.DriveLetter] = @{"DeviceID" = $Volume.DeviceID; "UsedSpaceGB" = $Volume.UsedSpaceGB} } }; $Output | ConvertTo-Json -Depth 5"""
                     _, stdout, stderr = client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
                     vol_dict= stdout.read().decode('utf-8').strip()
@@ -340,7 +333,21 @@ class Zeroapi:
             }),500
 
 
-
+    @app.route('/zeroapi/v1/backup/restore', methods=['POST'])
+    def restore():
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                pass
+        except Exception as e:
+            print(e)
+            return jsonify({"response":  -1}),500
+        
     @app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
     def on_demand():
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -401,12 +408,11 @@ class Zeroapi:
         except Exception as e:
             print(e)
             return jsonify({"response":  -1}),500
+        
 
     #UTILITY FUNCTIONS
-    
     @staticmethod
     def run_backup(storage_client, endpoint_username, endpoint_ip, commands):
-        """Runs SFTP commands on the target machine through the intermediary."""
         try:
             command = f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
             stdin, stdout, stderr = storage_client.exec_command(command)
@@ -430,9 +436,6 @@ class Zeroapi:
                 time.sleep(0.1)
 
             exit_code = stdout.channel.recv_exit_status()
-            print("ERROR IS", error_output )
-            print("EXIT IS", exit_code )
-            print("OUTPUT IS", output )
             storage_client.close()
             return output, error_output, exit_code
 

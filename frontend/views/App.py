@@ -7,6 +7,7 @@ from frontend.views.HomeView import HomeView
 from frontend.views.EndpointRegistration import EndpointRegistration
 from frontend.views.StorageRegistration import StorageRegistration
 from frontend.views.BackupJob import BackupJob
+from backend.Zeroapi import Zeroapi
 
 from frontend.components.ToolBar import ToolBar
 from PIL import Image, ImageTk
