@@ -42,7 +42,7 @@ class LoginView(gui.CTkFrame):
          
             if statcode == 200:
                 self.master.show_home_view() 
-                self.pack_forget() # Hide this view
+                self.pack_forget() 
                 self.master.tool_bar.grid(row=1, column=0, padx=0, pady=0, sticky="ew")
                 self.master.tool_bar.configure(height=35)
             else:

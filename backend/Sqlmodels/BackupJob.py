@@ -8,7 +8,7 @@ class BackupJob(db.Model):
     __tablename__ = 'backupjob'
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    esnpair = db.Column(db.String(36), ForeignKey('esnpair.id'),nullable=False, unique=True)
+    esnpair = db.Column(db.String(36), ForeignKey('esnpair.id'),nullable=False)
     name = db.Column(db.String(255), nullable=False, unique=True)
     target= db.Column(Text, nullable=True, default='{}')
     destination= db.Column(Text, nullable=True, default='{}')

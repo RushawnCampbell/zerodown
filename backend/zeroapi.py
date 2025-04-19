@@ -354,8 +354,8 @@ class Zeroapi:
             return jsonify({"response":  -1}),500
         
 
-    @app.route('/zeroapi/v1/backup/on_demand', methods=['POST'])
-    def on_demand():
+    @app.route('/zeroapi/v1/backup/first_time', methods=['POST'])
+    def first_time():
         user_token = request.headers.get('Authorization', '').split(' ')[-1]
         if not user_token:
             return jsonify({"response": -1}),500
@@ -373,17 +373,22 @@ class Zeroapi:
             storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
             storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
             storage_node_username = fetched_storage.username
+            storage_node_id = fetched_storage.id
             endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")
             endpoint_username = fetched_endpoint.username
-            storage_client, pairing_sftp_exit_code = Zeroapi.PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username)
+            endpoint_id = fetched_endpoint.id
+            storage_client, pairing_sftp_exit_code, isexists_code,  isexists_esn_pair_id = Zeroapi.PairESN(storage_node_id, storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username)
     
             if pairing_sftp_exit_code != 0:
                 return jsonify({"response": pairing_sftp_exit_code}), 500
     
-            esnpair_id = str(uuid.uuid4())
-            espnobj = ESNPair( storage_node_id=fetched_storage.id, endpoint_id=fetched_endpoint.id, id=esnpair_id)
-            db.session.add(espnobj)
-            db.session.commit()
+            if isexists_code == 0:
+                esnpair_id = str(uuid.uuid4())
+                espnobj = ESNPair( storage_node_id=fetched_storage.id, endpoint_id=fetched_endpoint.id, id=esnpair_id)
+                db.session.add(espnobj)
+                db.session.commit()
+            else:
+                esnpair_id = isexists_esn_pair_id
     
             data = request.get_json()
             selected_storage_volumes = data.get('backup_destinations')
@@ -419,7 +424,6 @@ class Zeroapi:
                                 Zeroapi.backup_with_errors[job_id].append(vol)
                             else:
                                 Zeroapi.backup_with_errors[job_id] = [vol]
-
                     storage_client.close()
             threading.Thread(target=run_backup_thread).start()
             job_name = data.get('name')
@@ -441,11 +445,21 @@ class Zeroapi:
             decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
             namepart = decoded['sub'].lower()
             fetched_user = User.query.filter_by(username=namepart).first()
-            if namepart != fetched_user.username.lower():
-                pass
+            if namepart == fetched_user.username.lower():
+                job_id = request.get_json()
+                job_id = job_id.get('job_id')
+            if job_id in Zeroapi.backup_with_success and job_id in Zeroapi.backup_with_errors:
+                return jsonify({"success":  Zeroapi.backup_with_success[job_id], "error" : Zeroapi.backup_with_errors[job_id] }),200
+            elif job_id not in Zeroapi.backup_with_success and job_id in Zeroapi.backup_with_errors:
+                return jsonify({"success":  [], "error" : Zeroapi.backup_with_errors[job_id] }),200
+            elif job_id in Zeroapi.backup_with_success and job_id not in Zeroapi.backup_with_errors:
+                return jsonify({"success":  Zeroapi.backup_with_success[job_id], "error" : [] }),200
+            else:
+                return jsonify({"success": [], "error" : [] }),200
         except Exception as e:
-            print("ERROR IS", e)
-            return jsonify({"in_progress": -1}),500
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            return jsonify({"response": -1}),500
 
     #UTILITY FUNCTIONS
     @staticmethod
@@ -481,17 +495,11 @@ class Zeroapi:
             return None, None, -1
     
     @staticmethod
-    def PairESN(storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_ip, endpoint_username):
-        pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
-        endpoint_client = paramiko.SSHClient()
-        endpoint_client.load_system_host_keys()
-        endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
-        endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
-        command = f'Add-Content -Path "$env:USERPROFILE\\.ssh\\authorized_keys" -Value \\"`n{storage_node_pub_key}\\"'
-        _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
-        error = stderr.read().decode('utf-8').strip()
-        endpoint_client.close()
-        if not error:
+    def PairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
+        #isexist = ESNPair.query.filter(ESNPair.storage_node_id == storage_node_id, ESNPair.endpoint_id == endpoint_id).all()
+        isexist =  ESNPair.query.filter(ESNPair.storage_node_id == storage_node_id, ESNPair.endpoint_id == endpoint_id).first()
+        if isexist != None:
+            pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
             storage_client = paramiko.SSHClient()
             storage_client.load_system_host_keys()
             storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
@@ -504,7 +512,30 @@ class Zeroapi:
             error = stderr.read().decode().strip()
             output = stdout.read().decode().strip()
             sftp_exit_code = stdout.channel.recv_exit_status()
-            
-            return storage_client,sftp_exit_code
+            return storage_client, sftp_exit_code, -2, isexist.id
         else:
-            return _, -1
+            pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+            endpoint_client = paramiko.SSHClient()
+            endpoint_client.load_system_host_keys()
+            endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
+            command = f'Add-Content -Path "$env:USERPROFILE\\.ssh\\authorized_keys" -Value \\"`n{storage_node_pub_key}\\"'
+            _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+            error = stderr.read().decode('utf-8').strip()
+            endpoint_client.close()
+            if not error:
+                storage_client = paramiko.SSHClient()
+                storage_client.load_system_host_keys()
+                storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                storage_client.connect(hostname=storage_node_ip, username=storage_node_username, port=22, pkey=pkey)
+                command =  f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
+                stdin, stdout, stderr = storage_client.exec_command(command)
+                stdin.write("bye\n")
+                stdin.flush()
+                stdin.close()
+                error = stderr.read().decode().strip()
+                output = stdout.read().decode().strip()
+                sftp_exit_code = stdout.channel.recv_exit_status()
+                return storage_client,sftp_exit_code, 0, None
+            else:
+                return _, -1, -1, None

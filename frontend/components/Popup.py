@@ -21,8 +21,8 @@ class Popup(gui.CTkToplevel):
     def set_window_position(self, window_width, window_height):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        x = (screen_width - window_width) // 2  # Center horizontally
-        y = (screen_height - window_height) // 2  # Center vertically
+        x = (screen_width - window_width) // 2  
+        y = (screen_height - window_height) // 2  
 
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(width=False, height=False)

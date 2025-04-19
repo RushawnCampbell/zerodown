@@ -13,9 +13,9 @@ class ToolBar(gui.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(2, weight=1)
    
-        self.menuimage = Image.open(os.path.join("frontend","assets", "icons", "add.png"))
+        self.menuimage = Image.open(os.path.join("frontend","assets", "icons", "menu.png"))
         self.ctk_image1 = gui.CTkImage(light_image=self.menuimage, dark_image=self.menuimage, size=(20, 20))
-        self.menu1 = gui.CTkButton(self, image=self.ctk_image1,hover_color="#2B2B2B",text="",)
+        self.menu1 = gui.CTkButton(self, image=self.ctk_image1,hover_color="#2B2B2B",text="")
         self.menu1.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.menu1.configure(fg_color="#000000")
         

@@ -5,20 +5,14 @@ import time
 from frontend.components.Popup import Popup
 from PIL import Image
 
-class JobStatus(Popup):
-    def __init__(self, master, title, total_storage_volumes, job_id):
+class JobRestore(Popup):
+    def __init__(self, master, title):
         super().__init__(master, title)
-        self.total_storage_volumes = total_storage_volumes
-        self.num_success = 0
-        self.num_error = 0
-        self.vol_with_success = []
-        self.vol_with_error = []
-        self.job_id = job_id
         self.master = master
         self.status_label= None
         self.is_complete = False  
         self.configure_body()
-        self.monitor_status() 
+        #self.monitor_status() 
 
     def configure_body(self):
         self.configure(fg_color="#FFFFFF")
@@ -32,28 +26,20 @@ class JobStatus(Popup):
         gif_label = gui.CTkLabel(main_frame, text="")
         gif_label.pack(pady=(0, 5))
 
-        status_text = f"Backing up to 1 of {self.total_storage_volumes} Storage Volumes "
+        status_text = f"Restoring"
         self.status_label = gui.CTkLabel(main_frame, text=status_text)
         self.status_label.pack(pady=(5, 0))
         self.status_label.configure(text_color="#1fa59d")
 
-        self.volumes_backed_up_label = gui.CTkLabel(main_frame, text=f"Storage Volumes:{self.num_success}")
-        self.volumes_backed_up_label.pack(pady=(0, 5))
-        self.volumes_backed_up_label.configure(text_color="#1F6AA5")
-
-        self.failed_volumes_label = gui.CTkLabel(main_frame, text=f"Failed Storage Volumes: {self.num_error}")
-        self.failed_volumes_label.pack(pady=(0, 5))
-        self.failed_volumes_label.configure(text_color="#1F6AA5")
-
-        gif_path = os.path.join("frontend", "assets", "icons", "backing_up.gif")
+        gif_path = os.path.join("frontend", "assets", "icons", "restore.gif")
         self.display_gif(gif_label, gif_path, 100, 100)
 
-        self.close_button = gui.CTkButton(self, text="Close(Backup will continue to run)", command=self.on_close)
+        self.close_button = gui.CTkButton(self, text="Close(Restoration will continue to run)", command=self.on_close)
         self.close_button.configure(state="normal", fg_color="#1fa59d")
         self.close_button.pack(pady=20)
 
     def get_status(self):
-        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/get_status"
+        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/restore/get_status"
         zauth_token = self.master.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
         try:
@@ -65,14 +51,6 @@ class JobStatus(Popup):
             print(f"Error fetching status: {e}")
             return {"success": [], "error" : []}
         
-    def vol_report(self, vol_list):
-        for vol in vol_list:
-            vol_str = ""
-            if vol_list.index(vol) == 0:
-                vol_str += f"{vol}"
-            else:
-                vol_str += f",{vol}"
-        return vol_str
 
     def monitor_status(self):
         if not self.is_complete:

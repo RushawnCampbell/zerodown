@@ -38,13 +38,13 @@ class BackupJob(gui.CTkFrame):
         backup_job_label.grid(row=0, column=0, padx=(20, 5), pady=(20, 5), sticky="w")
 
         self.backup_job_name = gui.CTkEntry(self.form_frame, fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000")
+        self.backup_job_name.bind("<FocusOut>", lambda event: self.master_validator(widget_label="job_name", event=event))
         self.backup_job_name.grid(row=1, column=0, padx=(20, 5), pady=(5, 5), sticky="ew")
 
         endpoint_label = gui.CTkLabel(self.form_frame, text="Select Endpoint")
         endpoint_label.grid(row=0, column=1, padx=(5, 20), pady=(20, 5), sticky="w")
 
         endpoints = self.fetch_objects("endpoints")
-        print("ENDPOINTS IS", endpoints)
         endpoints.insert(0, "-Select an Option-")
     
         self.endpoint_dropdown = gui.CTkComboBox(self.form_frame, values=endpoints, dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000", fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000", command=lambda selected_endpoint: self.activate_browse_button(selected_endpoint))
@@ -61,10 +61,12 @@ class BackupJob(gui.CTkFrame):
         storagenodes.insert(0, "-Select an Option-")
 
         self.storage_node_dropdown = gui.CTkComboBox(self.form_frame, values=storagenodes, fg_color="#2b2b2b", border_color="#2b2b2b", text_color="#000000", state=tk.DISABLED, command= lambda selected_storage: self.activate_select_destination(selected_storage))
+        self.storage_node_dropdown.bind("<FocusOut>", lambda event: self.master_validator(widget_label="storage_node_val", event=event))
         self.storage_node_dropdown.grid(row=4, column=0, padx=(20, 5), pady=(5, 5), sticky="ew")
 
         self.browse_destination_button = gui.CTkButton(self.form_frame, text="Select Backup Destination", state=tk.DISABLED, fg_color="#2b2b2b", command= self.select_storage_destination)
         self.browse_destination_button.grid(row=4, column=1, padx=(5, 20), pady=(5, 5), sticky="ew")
+        
 
         # Row 5: Make Copies On Another Storage Node Switch + Add another storage button.
         self.copy_switch_var = tk.BooleanVar()
@@ -91,7 +93,7 @@ class BackupJob(gui.CTkFrame):
         self.choose_location_button.grid(row=0, column=1, padx=(5, 5), pady=(5, 5), sticky="ew")
 
         # Row 7: Backup Now, Schedule Backup
-        self.backup_now_button = gui.CTkButton(self.form_frame, text="Backup Now", state=tk.DISABLED, fg_color="#2b2b2b", command=self.on_demand_backup)
+        self.backup_now_button = gui.CTkButton(self.form_frame, text="Backup Now", state=tk.DISABLED, fg_color="#2b2b2b", command=self.backup_now)
         self.backup_now_button.grid(row=7, column=0, padx=(20, 5), pady=(20,5), sticky="ew")
 
         self.schedule_backup_button = gui.CTkButton(self.form_frame, text="Schedule Backup", state=tk.DISABLED, fg_color="#2b2b2b")
@@ -174,12 +176,15 @@ class BackupJob(gui.CTkFrame):
             #return -1
 
     def activate_browse_button(self, selected_endpoint):
-        if selected_endpoint and selected_endpoint != "-Select an Option-":
+        if selected_endpoint !="" and selected_endpoint != "-Select an Option-":
             self.browse_items_button.configure(state=tk.NORMAL, fg_color="#1F6AA5", text=f"Browse {selected_endpoint} Backup Items")
         else:
             self.browse_items_button.configure(state=tk.DISABLED, fg_color="#2b2b2b", text="Select an Endpoint To Browse")
     
     def activate_select_destination(self, selected_storage):
+        storage_node_val =  self.master_validator(widget_label="storage_node_val")
+        if storage_node_val < 1:
+            return -1
         self.selected_storage= selected_storage
         self.get_storage_volumes(selected_storage)
         self.browse_destination_button.configure(state="normal", fg_color="#1F6AA5")
@@ -197,8 +202,16 @@ class BackupJob(gui.CTkFrame):
         RemoteExplorer(self, title, self.selected_storage, "storage", "backup")
 
 
-    def on_demand_backup(self):
-        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/on_demand"
+    def backup_now(self):
+
+        job_name =  self.master_validator(widget_label="job_name")
+        endpoint_val =  self.master_validator(widget_label="endpoint_val")
+        storage_node_val =  self.master_validator(widget_label="storage_node_val")
+
+        if job_name + endpoint_val + storage_node_val < 3:
+            return -1
+
+        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/first_time"
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
         try:
@@ -220,3 +233,34 @@ class BackupJob(gui.CTkFrame):
         
     def schedule_backup(self):
         pass
+
+
+    def master_validator(self, widget_label, event=None):
+        if widget_label == "job_name":
+            if  self.backup_job_name.get() == None or self.backup_job_name.get() == "":
+                self.backup_job_name.configure(text_color="#cc3300")
+                self.backup_job_name.delete(0, "end")
+                self.backup_job_name.insert(0,f"Name this Backup Job")
+                return 0
+            else:
+                self.backup_job_name.configure(text_color="#000000")
+                return 1
+        
+        if widget_label == "endpoint_val":
+            if  self.endpoint_dropdown.get() == "-Select an Option-":
+                self.browse_items_button.configure(state="disabled")
+                return 0
+            else:
+                self.browse_items_button.configure(state="normal")
+                return 1
+            
+
+        if widget_label == "storage_node_val":
+            if  self.storage_node_dropdown.get() == "-Select an Option-":
+                self.browse_destination_button.configure(state="disabled")
+                return 0
+            else:
+                self.browse_destination_button.configure(state="normal")
+                return 1
+
+        return -1

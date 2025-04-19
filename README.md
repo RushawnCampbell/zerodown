@@ -1150,3 +1150,69 @@ async def on_demand():
     except Exception as e:
         print(e)
         return jsonify({"response": -1}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import csv
+
+def write_log_to_csv(log_data, filename="log.csv"):
+    """
+    Writes log data to a CSV file.  Handles the case where the file
+    may or may not already exist.
+
+    Args:
+        log_data (dict): A dictionary containing the log data.
+            Expected keys: 'time', 'type', 'description', 'level'.
+        filename (str, optional): The name of the CSV file.
+            Defaults to "log.csv".
+    """
+    # Define the header row (column names)
+    header = ['time', 'type', 'description', 'level']
+
+    # Check if the file exists to determine if we need to write the header
+    write_header = True
+    try:
+        with open(filename, 'r', newline='') as csvfile:
+            # Use csv.Sniffer to determine if the file has a header
+            has_header = csv.Sniffer().has_header(csvfile.read(1024)) # Read the first 1024 bytes
+            if has_header:
+                write_header = False # if there is a header, don't write another one
+    except FileNotFoundError:
+        # If the file doesn't exist, we definitely need to write the header
+        write_header = True
+    except csv.Error:
+        # Handle other csv errors, like empty file, by writing the header
+        write_header = True
+
+    # Write the data to the CSV file
+    with open(filename, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=header)
+        if write_header:
+            writer.writeheader()  # Write the header row
+        writer.writerow(log_data)  # Write the data row
+
+if __name__ == "__main__":
+    # Example log data
+    log_entry = {
+        'time': '2025-10-25 22:33',
+        'type': 'endpoint registration',
+        'description': 'Registered endpoint One successfully',
+        'level': 'Info'
+    }
+
+    # Write the log data to log.csv
+    write_log_to_csv(log_entry)
+
+    print(f"Log entry written to log.csv")

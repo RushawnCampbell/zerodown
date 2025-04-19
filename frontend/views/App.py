@@ -54,8 +54,18 @@ class App(gui.CTk):
     def set_window_position(self, window_width, window_height):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        x = (screen_width - window_width) // 2  # Center horizontally
-        y = (screen_height - window_height) // 2  # Center vertically
+        x = (screen_width - window_width) // 2  
+        y = (screen_height - window_height) // 2  
+
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.resizable(width=False, height=False)
+
+
+    def set_window_position_top_centered(self, window_width, window_height):
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = 0  # Set the top y-coordinate to 0
 
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(width=False, height=False)
@@ -64,33 +74,31 @@ class App(gui.CTk):
         body_widget = self.grid_slaves(row=0)
         if body_widget:
             widget_to_remove = body_widget[0] 
-            widget_to_remove.grid_forget()
+            widget_to_remove.destroy()
+            self.home_view = HomeView(self)
             self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
             self.title("ZeroDown: Home")
 
     def show_home_view(self):
         self.title("ZeroDown: Home")
-        self.set_window_position(800,600)
-        self.login_view.grid_forget()  
+        self.set_window_position_top_centered(850,680)
+        self.login_view.pack_forget()  
         self.home_view = HomeView(self)
 
     def show_endpoint_registration(self):
         self.title("ZeroDown: Endpoint Registration")
-        #self.set_window_position(800,600)
         self.home_view.pack_forget()  
         self.endpoint_reg_view = EndpointRegistration(self, "Endpoint")
         self.endpoint_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def show_storage_registration(self):
         self.title("ZeroDown: Storage Node Registration")
-        #self.set_window_position(800,600)
-        self.home_view.pack_forget()  
+        self.home_view.pack_forget() 
         self.storage_reg_view = StorageRegistration(self, "Storage Node")
         self.storage_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def show_backup_job(self):
         self.title("ZeroDown: Create Backup Job")
-        #self.set_window_position(800,600)
         self.home_view.pack_forget()  
         self.backup_job_view = BackupJob(self)
         self.backup_job_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
@@ -145,11 +153,6 @@ class App(gui.CTk):
         except Exception as e:
             err_msg = str(e)
             tkint.messagebox.showerror("Token Deletion Failed", f"Error deleting token: {err_msg}")
-
-    #def store_crypto_key(windows_user, key_str,type):
-
-    def retrieve_crypto_key(self):
-        pass
 
 
     
