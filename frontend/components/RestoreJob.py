@@ -5,7 +5,7 @@ import time
 from frontend.components.Popup import Popup
 from PIL import Image
 
-class JobRestore(Popup):
+class RestoreJob(Popup):
     def __init__(self, master, title):
         super().__init__(master, title)
         self.master = master

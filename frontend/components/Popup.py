@@ -5,15 +5,15 @@ import os, platform, tkinter
 class Popup(gui.CTkToplevel):
     def __init__(self, master, title):
         super().__init__(master)
-        self.after(500, self.set_icon)
+        self.after(300, self.set_icon)
         self.title(title)
-        self.set_window_position(430,300) # increased height to accommodate button
+        self.set_window_position(430,300)
         self.transient(master)
         self.fade_app()
         self.configure(fg_color="#FFFFFF")
 
     def fade_app(self):
-        self.master.master.attributes("-alpha", 0.9) 
+        self.master.master.attributes("-alpha", 0.3) 
     
     def unfade_app(self):
         self.master.master.attributes("-alpha", 1) 

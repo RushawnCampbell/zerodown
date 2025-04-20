@@ -2,6 +2,7 @@ import customtkinter as gui, traceback, json, requests, tkinter as tk
 from PIL import Image
 from frontend.components.RemoteExplorer import RemoteExplorer
 from frontend.components.JobStatus import JobStatus
+from frontend.components.ScheduleJob import ScheduleJob
 
 class BackupJob(gui.CTkFrame):
     def __init__(self, master):
@@ -96,7 +97,7 @@ class BackupJob(gui.CTkFrame):
         self.backup_now_button = gui.CTkButton(self.form_frame, text="Backup Now", state=tk.DISABLED, fg_color="#2b2b2b", command=self.backup_now)
         self.backup_now_button.grid(row=7, column=0, padx=(20, 5), pady=(20,5), sticky="ew")
 
-        self.schedule_backup_button = gui.CTkButton(self.form_frame, text="Schedule Backup", state=tk.DISABLED, fg_color="#2b2b2b")
+        self.schedule_backup_button = gui.CTkButton(self.form_frame, text="Schedule Backup", state=tk.DISABLED, fg_color="#2b2b2b", command=self.schedule_job)
         self.schedule_backup_button.grid(row=7, column=1, padx=(5, 20), pady=(20, 5), sticky="ew")
 
         # Adjusted column configurations
@@ -264,3 +265,6 @@ class BackupJob(gui.CTkFrame):
                 return 1
 
         return -1
+    
+    def schedule_job(self):
+        ScheduleJob(self, "Scheduling Job")
