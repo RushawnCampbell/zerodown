@@ -19,6 +19,9 @@ class BackupJob(gui.CTkFrame):
         self.volumes = []
         self.selected_endpoint_info = {}
         self.selected_storage_info = {}
+        self.sch_datetime = None
+        self.sch_frequency = None
+        self.sch_day =  None
         self.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
         self.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
 
@@ -216,7 +219,7 @@ class BackupJob(gui.CTkFrame):
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
         try:
-            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_targets": self.selected_endpoint_info, "backup_destinations": self.selected_storage_info, "name": self.backup_job_name.get()})
+            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_targets": self.selected_endpoint_info, "backup_destinations": self.selected_storage_info, "name": self.backup_job_name.get(), "sch_datetime" : self.sch_datetime, "sch_frequency": self.sch_frequency, "sch_day": self.sch_day})
             response.raise_for_status()
             response= response.json()
             in_progress_num = response['in_progress']
@@ -231,14 +234,10 @@ class BackupJob(gui.CTkFrame):
         except requests.exceptions.RequestException as e:
             tk.messagebox.showerror("Backup Error", f"An unexpected error occurred. Please try again or contact ZeroDown Support for help.")
 
-        
-    def schedule_backup(self):
-        pass
-
 
     def master_validator(self, widget_label, event=None):
         if widget_label == "job_name":
-            if  self.backup_job_name.get() == None or self.backup_job_name.get() == "":
+            if  self.backup_job_name.get() == None or self.backup_job_name.get() == ""  or self.backup_job_name.get() == "Name this Backup Job":
                 self.backup_job_name.configure(text_color="#cc3300")
                 self.backup_job_name.delete(0, "end")
                 self.backup_job_name.insert(0,f"Name this Backup Job")
@@ -267,4 +266,19 @@ class BackupJob(gui.CTkFrame):
         return -1
     
     def schedule_job(self):
-        ScheduleJob(self, "Scheduling Job")
+        job_name_vf = self.master_validator(widget_label="job_name") #job name validation factor
+        storage_node_vf = self.master_validator(widget_label="storage_node_val") #storage node validation factor
+        endpoint_vf = self.master_validator(widget_label="endpoint_val") #endpoint  validation factor
+
+        if  job_name_vf <= 0:
+            tk.messagebox.showerror("Invalid Job Name", "You must enter a valid Job Name")
+
+        if storage_node_vf <= 0:
+            tk.messagebox.showerror("Invalid Storage Node Selection", "You Must Select A Storage Node")
+        
+        if endpoint_vf <= 0:
+             tk.messagebox.showerror("Invalid Endpoint Selection", "You Must Select An Endpoint")
+
+        if  not job_name_vf <= 0 and not storage_node_vf <= 0 and not endpoint_vf <= 0:
+            ScheduleJob(self, "Scheduling Job")
+    

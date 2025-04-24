@@ -365,6 +365,18 @@ class Zeroapi:
             fetched_user = User.query.filter_by(username=namepart).first()
             if namepart != fetched_user.username.lower():
                 return jsonify({"response": -1}),500
+            
+            data = request.get_json()
+            sch_datetime = data.get('sch_datetime')
+            sch_frequency = data.get('sch_frequency')
+            sch_day = data.get('sch_day')
+
+            if sch_datetime != None:
+                pass
+                #do esnpairing
+                #create backup job record
+                #create scheduled job record
+            
     
             fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
             fetched_storage = cache.get(f'{namepart}_current_storage_node')
@@ -390,7 +402,6 @@ class Zeroapi:
             else:
                 esnpair_id = isexists_esn_pair_id
     
-            data = request.get_json()
             selected_storage_volumes = data.get('backup_destinations')
             remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
             job_id = str(uuid.uuid4())
@@ -496,7 +507,6 @@ class Zeroapi:
     
     @staticmethod
     def PairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
-        #isexist = ESNPair.query.filter(ESNPair.storage_node_id == storage_node_id, ESNPair.endpoint_id == endpoint_id).all()
         isexist =  ESNPair.query.filter(ESNPair.storage_node_id == storage_node_id, ESNPair.endpoint_id == endpoint_id).first()
         if isexist != None:
             pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
@@ -539,3 +549,7 @@ class Zeroapi:
                 return storage_client,sftp_exit_code, 0, None
             else:
                 return _, -1, -1, None
+    
+    @staticmethod
+    def UnPairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
+        pass #for later
