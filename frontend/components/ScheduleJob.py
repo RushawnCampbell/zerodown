@@ -118,7 +118,7 @@ class ScheduleJob(Popup):
             selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
             scheduled_time = datetime(selected_date.year, selected_date.month, selected_date.day,
                                         int(selected_hour), int(selected_minute))
-            print(f"Scheduling job for: {scheduled_time}")  # your scheduling logic here
-            self.destroy()  # Close the toplevel window
+            print(f"Scheduling job for: {scheduled_time}")  
+            self.destroy()  
         except ValueError:
             print("Invalid date or time format")
