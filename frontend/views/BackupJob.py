@@ -207,32 +207,38 @@ class BackupJob(gui.CTkFrame):
 
 
     def backup_now(self):
+        job_name_vf = self.master_validator(widget_label="job_name") #job name validation factor
+        storage_node_vf = self.master_validator(widget_label="storage_node_val") #storage node validation factor
+        endpoint_vf = self.master_validator(widget_label="endpoint_val") #endpoint  validation factor
 
-        job_name =  self.master_validator(widget_label="job_name")
-        endpoint_val =  self.master_validator(widget_label="endpoint_val")
-        storage_node_val =  self.master_validator(widget_label="storage_node_val")
+        if  job_name_vf <= 0:
+            tk.messagebox.showerror("Invalid Job Name", "You must enter a valid Job Name")
 
-        if job_name + endpoint_val + storage_node_val < 3:
-            return -1
+        if storage_node_vf <= 0:
+            tk.messagebox.showerror("Invalid Storage Node Selection", "You Must Select A Storage Node")
+        
+        if endpoint_vf <= 0:
+             tk.messagebox.showerror("Invalid Endpoint Selection", "You Must Select An Endpoint")
 
-        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/first_time"
-        zauth_token = self.master.retrieve_auth_token()
-        zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
-        try:
-            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_targets": self.selected_endpoint_info, "backup_destinations": self.selected_storage_info, "name": self.backup_job_name.get(), "sch_datetime" : self.sch_datetime, "sch_frequency": self.sch_frequency, "sch_day": self.sch_day})
-            response.raise_for_status()
-            response= response.json()
-            in_progress_num = response['in_progress']
-            job_id = response['job_id']
+        if  not job_name_vf <= 0 and not storage_node_vf <= 0 and not endpoint_vf <= 0:
+            resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/first_time"
+            zauth_token = self.master.retrieve_auth_token()
+            zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
+            try:
+                response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.endpoint_name, "backup_targets": self.selected_endpoint_info, "backup_destinations": self.selected_storage_info, "name": self.backup_job_name.get()})
+                response.raise_for_status()
+                response= response.json()
+                in_progress_num = response['in_progress']
+                job_id = response['job_id']
 
-            if  in_progress_num >= 1:
-                title = f"Backup Job: {self.backup_job_name.get()} In Progress"
-                JobStatus(self, title, in_progress_num, job_id )
-            else:
-                tk.messagebox.showerror("Backup Error", f"Something Went Wrong: Failed to start backup")
+                if  in_progress_num >= 1:
+                    title = f"Backup Job: {self.backup_job_name.get()} In Progress"
+                    JobStatus(self, title, in_progress_num, job_id )
+                else:
+                    tk.messagebox.showerror("Backup Error", f"Something Went Wrong: Failed to start backup")
 
-        except requests.exceptions.RequestException as e:
-            tk.messagebox.showerror("Backup Error", f"An unexpected error occurred. Please try again or contact ZeroDown Support for help.")
+            except requests.exceptions.RequestException as e:
+                tk.messagebox.showerror("Backup Error", f"An unexpected error occurred. Please try again or contact ZeroDown Support for help.")
 
 
     def master_validator(self, widget_label, event=None):
@@ -280,5 +286,5 @@ class BackupJob(gui.CTkFrame):
              tk.messagebox.showerror("Invalid Endpoint Selection", "You Must Select An Endpoint")
 
         if  not job_name_vf <= 0 and not storage_node_vf <= 0 and not endpoint_vf <= 0:
-            ScheduleJob(self, "Scheduling Job")
+            ScheduleJob(self, "Scheduling Job", job_name=self.backup_job_name.get() )
     

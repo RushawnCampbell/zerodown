@@ -26,5 +26,5 @@ Compress(app)
 
 from flask_migrate import Migrate
 migrate =  Migrate(app,db)
-from .Sqlmodels import Endpoint, ESNPair, StorageNode, BackupJob, Schedule, User
+from .Sqlmodels import Endpoint, ESNPair, StorageNode, BackupJob, ScheduledJob, Schedule, User
 from . import Zeroapi

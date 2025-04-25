@@ -7,6 +7,7 @@ from .Sqlmodels.StorageNode import StorageNode
 from .Sqlmodels.ZeroCryptor import ZeroCryptor
 from .Sqlmodels.ESNPair import ESNPair
 from .Sqlmodels.BackupJob import BackupJob
+from .Sqlmodels.ScheduledJob import ScheduledJob
 import os, sys,jwt, logging, paramiko, uuid
 from datetime import datetime, timezone
 import time
@@ -17,9 +18,7 @@ class Zeroapi:
     backup_in_progress = 0
     backup_with_errors = {}
     backup_with_success = {}
-#MAIN ROUTE METHOD
 
-#Create User Administratively
     @app.route('/zeroapi/v1/adduser', methods=['GET'])
     def adduser():
         newuser  = User(first_name="Rushawn",last_name="Campbell",email="rushawn.campbell@mymona.uwi.edu", username="admin", password="admin123")
@@ -367,16 +366,6 @@ class Zeroapi:
                 return jsonify({"response": -1}),500
             
             data = request.get_json()
-            sch_datetime = data.get('sch_datetime')
-            sch_frequency = data.get('sch_frequency')
-            sch_day = data.get('sch_day')
-
-            if sch_datetime != None:
-                pass
-                #do esnpairing
-                #create backup job record
-                #create scheduled job record
-            
     
             fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
             fetched_storage = cache.get(f'{namepart}_current_storage_node')
@@ -396,7 +385,7 @@ class Zeroapi:
     
             if isexists_code == 0:
                 esnpair_id = str(uuid.uuid4())
-                espnobj = ESNPair( storage_node_id=fetched_storage.id, endpoint_id=fetched_endpoint.id, id=esnpair_id)
+                espnobj = ESNPair( storage_node_id= storage_node_id, endpoint_id= endpoint_id, id=esnpair_id)
                 db.session.add(espnobj)
                 db.session.commit()
             else:
@@ -446,6 +435,77 @@ class Zeroapi:
         except Exception as e:
             print("ERROR IS", e)
             return jsonify({"in_progress": -1}),500
+        
+    
+    @app.route('/zeroapi/v1/backup/schedule', methods=['POST'])
+    def schedule():
+        user_token = request.headers.get('Authorization', '').split(' ')[-1]
+        if not user_token:
+            return jsonify({"response": -1}),500
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart = decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart != fetched_user.username.lower():
+                return jsonify({"response": -1}),500
+            data = request.get_json()
+            
+            fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
+            fetched_storage = cache.get(f'{namepart}_current_storage_node')
+
+            zcryptobj = ZeroCryptor()
+            storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
+            storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
+            storage_node_username = fetched_storage.username
+            storage_node_id = fetched_storage.id
+            endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")
+            endpoint_username = fetched_endpoint.username
+            endpoint_id = fetched_endpoint.id
+            storage_client, pairing_sftp_exit_code, isexists_code,  isexists_esn_pair_id = Zeroapi.PairESN(storage_node_id, storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username)
+            storage_client.close()
+
+            if pairing_sftp_exit_code != 0:
+                return jsonify({"response": "Preflight Test Failed, We Couldn't Connect Your Endpoint To The Storage Node. Verify that SSH Server Service is running on both."}), 500
+    
+            if isexists_code == 0:
+                esnpair_id = str(uuid.uuid4())
+                espnobj = ESNPair( storage_node_id=storage_node_id, endpoint_id= endpoint_id, id=esnpair_id)
+                db.session.add(espnobj)
+                db.session.commit()
+            else:
+                esnpair_id = isexists_esn_pair_id
+                
+    
+            job_id = str(uuid.uuid4())
+            job_name = data.get('name')
+
+            backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
+            db.session.add(backupjob)
+            #db.session.commit()
+        
+            sch_datetime = data.get('sch_datetime')
+            sch_frequency = data.get('sch_frequency')
+            sch_day = data.get('sch_day')
+
+            print ("DATE TIME TYPE IS", type(sch_datetime))
+            print ("DAY TYPE IS", type(sch_day))
+            print ("FREQUENCY TYPE IS", type(sch_frequency))
+
+            if sch_frequency == "Weekly":
+                scheduled_job = ScheduledJob(job_id=job_id, frequency=sch_frequency, sch_datetime = sch_datetime, sch_day = sch_day )
+            else:
+                scheduled_job = ScheduledJob(job_id=job_id, frequency=sch_frequency, sch_datetime = sch_datetime)
+            
+            db.session.add(scheduled_job)
+            #db.session.flush()
+            db.session.commit()
+            print("ADDED JOB AND SCHEDULE")
+            return jsonify({"response": "Your Backup Job Was Created And Will Execute As Scheduled"}), 200
+
+        except Exception as e:
+            print("ERROR IS", e)
+            return jsonify({"in_progress": -1}),500
+        
         
     @app.route('/zeroapi/v1/backup/get_status', methods=['POST'])
     def get_status():
@@ -553,3 +613,4 @@ class Zeroapi:
     @staticmethod
     def UnPairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
         pass #for later
+
