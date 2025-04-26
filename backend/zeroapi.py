@@ -1,4 +1,4 @@
-from .  import app, cache, db
+from .  import app, cache, db, scheduler
 from flask import request, jsonify, send_file
 from werkzeug.security import check_password_hash
 from .Sqlmodels.User import User
@@ -12,7 +12,6 @@ import os, sys,jwt, logging, paramiko, uuid
 from datetime import datetime, timezone
 import time
 import threading
-
 
 class Zeroapi:
     backup_in_progress = 0
@@ -481,15 +480,13 @@ class Zeroapi:
 
             backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
             db.session.add(backupjob)
-            #db.session.commit()
+            db.session.flush()
         
             sch_datetime = data.get('sch_datetime')
+            sch_datetime = datetime.strptime(sch_datetime, '%Y-%m-%d %H:%M:%S')
             sch_frequency = data.get('sch_frequency')
             sch_day = data.get('sch_day')
 
-            print ("DATE TIME TYPE IS", type(sch_datetime))
-            print ("DAY TYPE IS", type(sch_day))
-            print ("FREQUENCY TYPE IS", type(sch_frequency))
 
             if sch_frequency == "Weekly":
                 scheduled_job = ScheduledJob(job_id=job_id, frequency=sch_frequency, sch_datetime = sch_datetime, sch_day = sch_day )
@@ -497,9 +494,56 @@ class Zeroapi:
                 scheduled_job = ScheduledJob(job_id=job_id, frequency=sch_frequency, sch_datetime = sch_datetime)
             
             db.session.add(scheduled_job)
-            #db.session.flush()
             db.session.commit()
-            print("ADDED JOB AND SCHEDULE")
+
+
+            if sch_frequency == "One Time":
+                print("Attempting to schedule job Once...") 
+                scheduler.add_job(
+                    func=Zeroapi.print_hello,
+                    trigger='date',
+                    run_date=sch_datetime,
+                    args=[job_id],  
+                    id=job_id,  
+                    replace_existing=True
+                )
+            elif sch_frequency == "Daily":
+                scheduler.add_job(
+                    func=Zeroapi.print_hello,
+                    trigger='cron',
+                    hour=sch_datetime.hour,
+                    minute=sch_datetime.minute,
+                    args=[job_id],
+                    id=job_id,
+                    replace_existing=True
+                   )
+            elif sch_frequency == "Weekly":
+                scheduler.add_job(
+                    func=Zeroapi.print_hello,
+                    trigger='cron',
+                    day_of_week=sch_day,  # Use the sch_day
+                    hour=sch_datetime.hour,
+                    minute=sch_datetime.minute,
+                    args=[job_id],
+                    id=job_id,
+                    replace_existing=True
+                )
+
+            elif sch_frequency == "Monthly":
+                scheduler.add_job(
+                    func=Zeroapi.print_hello,
+                    trigger='cron',
+                    day=sch_datetime.day,
+                    hour=sch_datetime.hour,
+                    minute=sch_datetime.minute,
+                    args=[job_id],
+                    id=job_id,
+                    replace_existing=True
+                )
+
+            time.sleep(60)
+            print("SCHEDULED JOBS", scheduler.get_jobs())
+ 
             return jsonify({"response": "Your Backup Job Was Created And Will Execute As Scheduled"}), 200
 
         except Exception as e:
@@ -614,3 +658,8 @@ class Zeroapi:
     def UnPairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
         pass #for later
 
+    @staticmethod
+    def print_hello(job_id):
+        print(f"HELLO WORLD {job_id}")
+    
+   

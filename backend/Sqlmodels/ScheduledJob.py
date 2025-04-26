@@ -1,9 +1,9 @@
-import uuid, threading
+import uuid
+#import threading, keyring, getpass, requests
 from  .. import db
-from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, ForeignKey, DateTime, event
+from datetime import datetime
+from sqlalchemy import Column, String, DateTime, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from Sqlmodels.ScheduledJob import ScheduledJob
 
 class ScheduledJob(db.Model):
     __tablename__ = 'scheduledjob'
@@ -14,7 +14,7 @@ class ScheduledJob(db.Model):
     sch_datetime = Column(DateTime, nullable=False)
     next_sch_datetime = Column(DateTime, default=None, nullable=True)
     sch_day = db.Column(db.String(9), default=None, nullable=True)
-    created = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created = Column(DateTime, default=lambda: datetime.now())
     
    
     existing_job = relationship("BackupJob", backref="jobid")
@@ -24,17 +24,12 @@ class ScheduledJob(db.Model):
         self.frequency = frequency
         self.sch_datetime =  sch_datetime
 
-job_initiation_dict = {}
-def Scheduled_Job_Watcher(mapper, connection, target, event_type):
-    print(f"Thread started for {event_type} event in table: {mapper.class_.__name__}")
-    print(f"Affected record ID: {getattr(target, 'id', target)}")
+
+            
+"""def Scheduled_Job_Watcher(mapper, connection, target, event_type):
     sch_job_id = getattr(target, 'id', target)
-
     if event_type == "insert":
-        job_initiation_dict[sch_job_id] = sch_job_id
-
-    if event_type == "delete":
-        del job_initiation_dict[sch_job_id]
+        pass
 
 
 def sch_job_watcher_in_thread(mapper, connection, target, event_type):
@@ -43,8 +38,6 @@ def sch_job_watcher_in_thread(mapper, connection, target, event_type):
 
 @event.listens_for(ScheduledJob, 'after_insert')
 def receive_after_insert(mapper, connection, target):
-    sch_job_watcher_in_thread(mapper, connection, target, 'insert')
+    sch_job_watcher_in_thread(mapper, connection, target, 'insert')"""
 
-@event.listens_for(ScheduledJob, 'after_delete')
-def receive_after_delete(mapper, connection, target):
-    sch_job_watcher_in_thread(mapper, connection, target, 'delete')
+

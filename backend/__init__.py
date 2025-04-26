@@ -7,6 +7,7 @@ from flask_session import Session
 from .config import Config
 from flask_compress import Compress
 from flask_caching import Cache
+from flask_apscheduler import APScheduler
 
 app = Flask(__name__)
 cache = Cache(config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT':3600})
@@ -15,6 +16,9 @@ app.config.from_object(Config)
 
 app.config['SESSION_TYPE'] = 'sqlalchemy'
 db = SQLAlchemy(app)
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
 app.config['SESSION_SQLALCHEMY'] = db
 sess= Session(app)
 

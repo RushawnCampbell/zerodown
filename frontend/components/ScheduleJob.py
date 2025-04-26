@@ -208,7 +208,6 @@ class ScheduleJob(Popup):
                 self.master.sch_day = selected_day_abbr
             self.master.sch_datetime = schedule_datetime.strftime("%Y-%m-%d %H:%M:%S") # Store as string for consistency
             self.create_schedule()
-            self.destroy()
             return 0  # Indicate success
         else:
             return -1  # Indicate cancellation
@@ -225,6 +224,8 @@ class ScheduleJob(Popup):
             schedule_status = response['response']
 
             if response_code == 200:
+                 self.unfade_app()
+                 self.destroy()
                  tk.messagebox.showinfo("Scheduling Successful", f"{self.job_name} Was Scheduled Successfully")
             else:
                 tk.messagebox.showerror("Scheduling Error", f"{schedule_status}. Contact ZeroDown Support If The Error Persists.")
