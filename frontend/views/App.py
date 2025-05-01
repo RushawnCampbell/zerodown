@@ -2,12 +2,16 @@ from tkinter import *
 import tkinter as tkint
 import os, platform, keyring, getpass
 import customtkinter as gui
-from frontend.views.LoginView import LoginView
-from frontend.views.HomeView import HomeView
-from frontend.views.EndpointRegistration import EndpointRegistration
-from frontend.views.StorageRegistration import StorageRegistration
-from frontend.views.BackupJob import BackupJob
-from backend.Zeroapi import Zeroapi
+from frontend.views.Loginview import Loginview
+from frontend.views.Homeview import Homeview
+from frontend.views.Endpointregistration import Endpointregistration
+from frontend.views.Endpointmanagement import Endpointmanagement
+from frontend.views.Storageregistration import Storageregistration
+from frontend.views.Storagemanagement import Storagemanagement
+from frontend.views.Backupjob import Backupjob
+from frontend.components.Menu import Menu
+
+import sys
 
 from frontend.components.ToolBar import ToolBar
 from PIL import Image, ImageTk
@@ -16,23 +20,31 @@ class App(gui.CTk):
     def __init__(self):
         super().__init__()
         self.app_name="ZeroDown"
+        self.title("ZeroDown: Backup & Restoration Solution")
         self.windows_user= self.get_windows_username()
         self.configure(bg_color="red")
-        self.title("ZeroDown: Backup & Restoration Solution")
         self.grid_columnconfigure(0, weight=1) 
         self.grid_rowconfigure(0, weight=1) 
         self.grid_rowconfigure(1, weight=0) 
         self.set_window_position(400,200)
-
         self.set_icon()
 
-        self.home_view = None
-        self.backup_view = None  # Initialize to None
-        self.restore_view = None
-        self.endpoint_reg_view = None
+        self.homeview = None
+        self.backupjob = None  
+        self.restoreview = None
+        self.endpointregistration = None
+        self.endpointmanagement = None
+        self.storagemanagement = None
+        self.storageregistration = None
+        self.current_body_widget = None
+        self.current_body_widget_name= None
+        self.widget_str = None
+        self.menu= None
         self.tool_bar= ToolBar(self)
         self.tool_bar.grid_forget()
-        self.login_view = LoginView(self)
+
+        self.loginview = Loginview(self)
+        
 
     def set_icon(self):
         try:
@@ -65,43 +77,119 @@ class App(gui.CTk):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         x = (screen_width - window_width) // 2
-        y = 0  # Set the top y-coordinate to 0
+        y = 0  
 
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(width=False, height=False)
 
     def route_home(self):
-        body_widget = self.grid_slaves(row=0)
-        if body_widget:
-            widget_to_remove = body_widget[0] 
-            widget_to_remove.destroy()
-            self.home_view = HomeView(self)
-            self.home_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
-            self.title("ZeroDown: Home")
+        try:
+            self.current_body_widget = self.grid_slaves(row=0)
+            if self.current_body_widget:
+                self.current_body_widget = self.current_body_widget[0]
+                setattr(self, "current_body_widget_name", self.current_body_widget.__class__.__name__ )
 
-    def show_home_view(self):
-        self.title("ZeroDown: Home")
-        self.set_window_position_top_centered(850,680)
-        self.login_view.pack_forget()  
-        self.home_view = HomeView(self)
+                if self.current_body_widget.__class__.__name__ == "Homeview":
+                    return
 
-    def show_endpoint_registration(self):
-        self.title("ZeroDown: Endpoint Registration")
-        self.home_view.pack_forget()  
-        self.endpoint_reg_view = EndpointRegistration(self, "Endpoint")
-        self.endpoint_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+                elif self.current_body_widget.__class__.__name__ == "Menu":
+                    self.menu.grid_forget()
+                    if self.homeview == None:
+                        self.set_window_position_top_centered(850,680)
+                        self.homeview = Homeview(self)
+                        return
+                    else:
+                        self.title("ZeroDown: Home")
+                        self.homeview.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+                        return
 
-    def show_storage_registration(self):
-        self.title("ZeroDown: Storage Node Registration")
-        self.home_view.pack_forget() 
-        self.storage_reg_view = StorageRegistration(self, "Storage Node")
-        self.storage_reg_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+                else:
+                    if self.homeview == None:
+                        self.set_window_position_top_centered(850,680)
+                        self.homeview = Homeview(self)
+                        return
+                    getattr(self, self.current_body_widget_name.lower()).destroy()
+                    setattr(self, self.current_body_widget_name.lower(), None)
+                    self.title("ZeroDown: Home")
+                    self.homeview.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+                    return
+            else:
+                return
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            print(f"An exception occurred: {e}")
+            print(f"Line number: {line_number}")
+            tkint.messagebox.showerror("Render Error", "An Error Occurred While Rendering This Screen")
 
-    def show_backup_job(self):
-        self.title("ZeroDown: Create Backup Job")
-        self.home_view.pack_forget()  
-        self.backup_job_view = BackupJob(self)
-        self.backup_job_view.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+    def show_menu(self):
+        self.current_body_widget = self.grid_slaves(row=0)
+        if self.current_body_widget:
+
+            self.current_body_widget =  self.current_body_widget[0]
+            self.current_body_widget_name = self.current_body_widget.__class__.__name__.lower()
+            
+            if self.current_body_widget_name == "menu":
+                self.title("ZeroDown: Main Menu")
+                return
+            
+            tkinterstring = f"self.{self.current_body_widget_name}.grid_forget()"
+            eval(tkinterstring)
+        
+            if self.menu == None:
+                self.menu = Menu(self)
+                self.widget_str =  f"self.{self.current_body_widget_name}"
+            else:
+                self.title("ZeroDown: Main Menu")
+                self.menu.grid(row=0, column=0, padx=100, pady=100, sticky="nsew")
+                self.widget_str= f"self.{self.current_body_widget_name}"
+
+
+    def hide_menu(self):
+        self.menu.grid_forget()
+        if eval(self.widget_str) == None:
+            new_widget_obj_str = self.current_body_widget_name.title()
+            eval(f"{new_widget_obj_str}.(self)")
+        else:
+            eval(f"{self.widget_str}.grid(row=0, column=0, padx=20, pady=20, sticky='nsew')")
+
+
+    def show_view(self, viewclassname):
+        try:
+            self.current_body_widget = self.grid_slaves(row=0)
+            if self.current_body_widget:
+
+                self.current_body_widget =  self.current_body_widget[0]
+                self.current_body_widget_name = self.current_body_widget.__class__.__name__.lower()
+            
+                if getattr(self, "current_body_widget_name") == 'homeview':
+                    self.homeview.grid_forget()
+                elif getattr(self, "current_body_widget_name") == 'menu':
+                    self.menu.grid_forget()
+                else:
+                    getattr(self, f"{self.current_body_widget_name}").destroy()
+                    setattr(self, f"{self.current_body_widget_name}", None) 
+
+                if getattr(self, viewclassname) == None:
+                    if viewclassname == "endpointregistration":
+                        self.endpointregistration  = Endpointregistration(self, 'Endpoint')
+
+                    elif viewclassname == "storageregistration":
+                        self.storageregistration  = Storageregistration(self, 'Endpoint')
+
+                    else:
+                        tkinterstring = f"{viewclassname.title()}(self)"
+                        setattr(self, viewclassname, eval(tkinterstring) )
+                else:
+                
+                    getattr(self, viewclassname).grid(row=0, column=0, padx=20, pady=20, sticky='nsew')
+        except Exception as e:
+            tkint.messagebox.showerror("Render Error", "An Error Occurred While Rendering This View. Please Report To ZeroDown Support If It Reoccurrs.")
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            print(f"An exception occurred: {e}")
+            print(f"Line number: {line_number}")
 
 
     def get_windows_username(self):

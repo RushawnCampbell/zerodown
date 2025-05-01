@@ -4,9 +4,11 @@ from frontend.components.RemoteExplorer import RemoteExplorer
 from frontend.components.JobStatus import JobStatus
 from frontend.components.ScheduleJob import ScheduleJob
 
-class BackupJob(gui.CTkFrame):
+class Backupjob(gui.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
+        self.master = master
+        self.master.title("ZeroDown: Create Backup Job")
         self.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         self.endpoint_name = None
         self.storage_node_dropdown = None

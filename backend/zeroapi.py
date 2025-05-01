@@ -394,37 +394,8 @@ class Zeroapi:
             remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
             job_id = str(uuid.uuid4())
     
-            def handle_sftp_result(output, error_output, backup_exit_code):
-                if backup_exit_code == 0 and not error_output:
-                    return backup_exit_code
-                else:
-                    print(f"Remote SFTP failed. Exit code: {backup_exit_code}, Error: {error_output}")
-                    return -1
-    
-            def run_backup_thread():
-                if "Volumes" in selected_storage_volumes:
-                    selected_storage_volumes_list = selected_storage_volumes['Volumes'].keys()
-                    for vol in selected_storage_volumes_list:
-                        backup_destination = f'{vol}\\'
-                        sftp_commands = [
-                            f'get -r {remote_folder} {backup_destination}',
-                            'bye'
-                        ]
-                        output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
-                        result = handle_sftp_result(output, error_output, backup_exit_code)
-                        
-                        if result == 0:
-                            if job_id in Zeroapi.backup_with_success:
-                                Zeroapi.backup_with_success[job_id].append(vol)
-                            else:
-                                Zeroapi.backup_with_success[job_id] = [vol]
-                        else:
-                            if job_id in Zeroapi.backup_with_errors:
-                                Zeroapi.backup_with_errors[job_id].append(vol)
-                            else:
-                                Zeroapi.backup_with_errors[job_id] = [vol]
-                    storage_client.close()
-            threading.Thread(target=run_backup_thread).start()
+   
+            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, remote_folder, selected_storage_volumes, job_id)).start()
             job_name = data.get('name')
             backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
             db.session.add(backupjob)
@@ -496,52 +467,51 @@ class Zeroapi:
             db.session.add(scheduled_job)
             db.session.commit()
 
-
+            selected_storage_volumes = data.get('backup_destinations')
             if sch_frequency == "One Time":
                 print("Attempting to schedule job Once...") 
                 scheduler.add_job(
-                    func=Zeroapi.print_hello,
+                    func=Zeroapi.run_scheduled_backup,
                     trigger='date',
                     run_date=sch_datetime,
-                    args=[job_id],  
+                    args=[job_id, selected_storage_volumes ],  
                     id=job_id,  
                     replace_existing=True
                 )
             elif sch_frequency == "Daily":
                 scheduler.add_job(
-                    func=Zeroapi.print_hello,
+                    func=Zeroapi.run_scheduled_backup,
                     trigger='cron',
                     hour=sch_datetime.hour,
                     minute=sch_datetime.minute,
-                    args=[job_id],
+                    args=[job_id, selected_storage_volumes],
                     id=job_id,
                     replace_existing=True
                    )
             elif sch_frequency == "Weekly":
                 scheduler.add_job(
-                    func=Zeroapi.print_hello,
+                    func=Zeroapi.run_scheduled_backup,
                     trigger='cron',
                     day_of_week=sch_day,  # Use the sch_day
                     hour=sch_datetime.hour,
                     minute=sch_datetime.minute,
-                    args=[job_id],
+                    args=[job_id,selected_storage_volumes],
                     id=job_id,
                     replace_existing=True
                 )
 
             elif sch_frequency == "Monthly":
                 scheduler.add_job(
-                    func=Zeroapi.print_hello,
+                    func=Zeroapi.run_scheduled_backup,
                     trigger='cron',
                     day=sch_datetime.day,
                     hour=sch_datetime.hour,
                     minute=sch_datetime.minute,
-                    args=[job_id],
+                    args=[job_id, selected_storage_volumes],
                     id=job_id,
                     replace_existing=True
                 )
 
-            time.sleep(60)
             print("SCHEDULED JOBS", scheduler.get_jobs())
  
             return jsonify({"response": "Your Backup Job Was Created And Will Execute As Scheduled"}), 200
@@ -653,13 +623,66 @@ class Zeroapi:
                 return storage_client,sftp_exit_code, 0, None
             else:
                 return _, -1, -1, None
+            
+    @staticmethod
+    def handle_sftp_result(output, error_output, backup_exit_code):
+       if backup_exit_code == 0 and not error_output:
+           print("BACKUP WAS SUCCESSSSSSSS!")
+           return backup_exit_code
+       else:
+           print(f"Remote SFTP failed. Exit code: {backup_exit_code}, Error: {error_output}")
+           return -1
+       
+    @staticmethod
+    def run_backup_thread(storage_client, endpoint_username, endpoint_ip, remote_folder,selected_storage_volumes, job_id):
+        if "Volumes" in selected_storage_volumes:
+            selected_storage_volumes_list = selected_storage_volumes['Volumes'].keys()
+            for vol in selected_storage_volumes_list:
+                backup_destination = f'{vol}\\'
+                sftp_commands = [
+                    f'get -r {remote_folder} {backup_destination}',
+                    'bye'
+                ]
+                output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
+                result = Zeroapi.handle_sftp_result(output, error_output, backup_exit_code)
+                
+                if result == 0:
+                    if job_id in Zeroapi.backup_with_success:
+                        Zeroapi.backup_with_success[job_id].append(vol)
+                    else:
+                        Zeroapi.backup_with_success[job_id] = [vol]
+                else:
+                    if job_id in Zeroapi.backup_with_errors:
+                        Zeroapi.backup_with_errors[job_id].append(vol)
+                    else:
+                        Zeroapi.backup_with_errors[job_id] = [vol]
+            storage_client.close()
     
     @staticmethod
     def UnPairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
         pass #for later
 
     @staticmethod
-    def print_hello(job_id):
-        print(f"HELLO WORLD {job_id}")
+    def run_scheduled_backup(job_id, selected_storage_volumes):
+
+        with app.app_context():
+            zcryptobj = ZeroCryptor()
+            backupjob = BackupJob.query.filter_by(id=job_id).first()
+            storage_node_ip = backupjob.esn_pair.storage_node.ip
+            storage_node_ip = zcryptobj._decrypt_data(encrypted_data=storage_node_ip, type="STORAGE")
+            storage_node_username = backupjob.esn_pair.storage_node.username
+            endpoint_username = backupjob.esn_pair.endpoint.username
+            endpoint_ip = backupjob.esn_pair.endpoint.ip
+            endpoint_ip = zcryptobj._decrypt_data(encrypted_data=endpoint_ip, type="ENDPOINT")
+            remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
+
+            pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+            storage_client = paramiko.SSHClient()
+            storage_client.load_system_host_keys()
+            storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            storage_client.connect(hostname=storage_node_ip, username=storage_node_username, port=22, pkey=pkey)
+
+            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, remote_folder, selected_storage_volumes, job_id)).start()
+    
     
    

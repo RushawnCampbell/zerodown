@@ -7,6 +7,7 @@ from PIL import Image
 class Registration(gui.CTkFrame):
     def __init__(self, master, reg_type):
         super().__init__(master)
+        self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
         self.reg_type = reg_type
         self.master = master
         self.fetched_pub = None
@@ -91,7 +92,7 @@ class Registration(gui.CTkFrame):
         self.view_title_frame.grid(row=0, column=0, padx=40, pady=20, sticky="nsew")
         self.view_title.pack(pady=(0, 0), padx=0, fill="x")
 
-        self.form_body.grid(row=1, column=0, padx=100, pady=(0, 20), sticky="nsew")
+        self.form_body.grid(row=1, column=0, padx=50, pady=(0, 20), sticky="nsew")
 
         self.step1_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="ew")
         self.step1_entry_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")

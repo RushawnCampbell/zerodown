@@ -5,13 +5,15 @@ from frontend.components.RestoreJob import RestoreJob
 import datetime
 import textwrap
 
-class HomeView(gui.CTkFrame):
+class Homeview(gui.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
-
         self.master = master
-        self.configure(fg_color="#2B2B2B")
+
+        self.master.title("ZeroDown: Home")
         self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+        self.configure(fg_color="#2B2B2B")
 
         self.grid_rowconfigure(0, weight=0) # For the recent jobs label
         self.grid_rowconfigure(1, weight=1) # For the recent jobs frame
@@ -28,7 +30,9 @@ class HomeView(gui.CTkFrame):
         self.recent_frame = gui.CTkScrollableFrame(self, width=850, height=80) # Further reduced height
         self.recent_frame.grid(row=1, column=0, padx=40, pady=(2, 2), sticky="ew")
         self.recent_frame.configure(fg_color="#000000")
-        self.sample_data = [] # Initialize as empty list
+        self.sample_data = [ {"time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Daily files backup", "level": "Full"},
+    {"time": (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "type": "Database", "description": "Weekly database dump", "level": "Differential"},
+    {"time": (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"), "type": "System", "description": "Monthly full system check with a very long description that should wrap within the allocated width", "level": "Informational"},] # Initialize as empty list
         self.recent_no_data_label = None
 
         # Storage Nodes Label
@@ -38,7 +42,9 @@ class HomeView(gui.CTkFrame):
         self.storage_frame = gui.CTkScrollableFrame(self, width=850, height=40) # Further reduced height
         self.storage_frame.grid(row=3, column=0, padx=40, pady=(2, 8), sticky="ew")
         self.storage_frame.configure(fg_color="#202020")
-        self.sample_storage_data = [] # Initialize as empty list
+        self.sample_storage_data = [{"Storage Node": "Server A", "Used Storage": "500 GB", "Available Storage": "1 TB"},
+    {"Storage Node": "NAS Unit 1", "Used Storage": "2 TB", "Available Storage": "5 TB"},
+    {"Storage Node": "Cloud Backup", "Used Storage": "100 GB", "Available Storage": "Unlimited"}] # Initialize as empty list
         self.storage_no_data_label = None
         self.storage_add_button = None
 
@@ -55,17 +61,17 @@ class HomeView(gui.CTkFrame):
 
         image = Image.open("./frontend/assets/icons/computer.png")
         self.ctk_image1 = gui.CTkImage(light_image=image, dark_image=image, size=(50, 50))
-        self.button1 = gui.CTkButton(self.button_frame, image=self.ctk_image1, text=" Register \n Endpoint", command=self.master.show_endpoint_registration)
+        self.button1 = gui.CTkButton(self.button_frame, image=self.ctk_image1, text=" Register \n Endpoint", command= lambda viewclassname='endpointregistration' : self.master.show_view(viewclassname))
         self.button1.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
         image2 = Image.open("./frontend/assets/icons/database.png")
         self.ctk_image2 = gui.CTkImage(light_image=image2, dark_image=image2, size=(50, 50))
-        self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node", command=self.master.show_storage_registration)
+        self.button2 = gui.CTkButton(self.button_frame, image=self.ctk_image2, text=" Register \n Storage Node", command=lambda viewclassname='storageregistration' : self.master.show_view(viewclassname))
         self.button2.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         image3 = Image.open("./frontend/assets/icons/backup.png")
         self.ctk_image3 = gui.CTkImage(light_image=image3, dark_image=image3, size=(50, 50))
-        self.button3 = gui.CTkButton(self.button_frame, image=self.ctk_image3, text=" Create \n Backup", command=self.master.show_backup_job)
+        self.button3 = gui.CTkButton(self.button_frame, image=self.ctk_image3, text=" Create \n Backup", command=lambda viewclassname='backupjob' : self.master.show_view(viewclassname))
         self.button3.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
         image4 = Image.open("./frontend/assets/icons/recover.png")
@@ -85,7 +91,7 @@ class HomeView(gui.CTkFrame):
         if not self.sample_storage_data:
             self.storage_no_data_label = gui.CTkLabel(self.storage_frame, text="You Do Not Have Any Registered Storage Nodes ")
             self.storage_no_data_label.grid(row=0, column=0, padx=20, pady=(10, 5), sticky="ew")
-            self.storage_add_button = gui.CTkButton(self.storage_frame, text="Register Storage Node")
+            self.storage_add_button = gui.CTkButton(self.storage_frame, text="Register Storage Node", command=lambda viewclassname='storageregistration' : self.master.show_view(viewclassname))
             self.storage_add_button.grid(row=1, column=0, padx=20, pady=(5, 10), sticky="ew")
             self.storage_frame.grid_rowconfigure(0, weight=1) # Center vertically
             self.storage_frame.grid_rowconfigure(1, weight=1) # Center vertically
