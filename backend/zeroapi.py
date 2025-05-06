@@ -250,6 +250,78 @@ class Zeroapi:
             return jsonify({"message": "Access token is missing or invalid"}),401
         
 
+
+
+    @app.route('/zeroapi/v1/object/<object_type>/<object_id>', methods=['GET'])
+    def object(object_type, object_id):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                try:
+                    if object_type == "endpoint":
+                        fetched_endpoint = Endpoint.query.filter_by(id=object_id).first()
+                        fetched_endpoint_dict= {}
+
+                        zcryptobj= ZeroCryptor()
+                        encrypted_ip= fetched_endpoint.ip
+                        plain_ip = zcryptobj._decrypt_data(encrypted_data=encrypted_ip, type="ENDPOINT")
+
+                        fetched_endpoint_dict['ip'] = plain_ip
+                        fetched_endpoint_dict['authorized_user'] = fetched_endpoint.username
+                        fetched_endpoint_dict['scheduled_jobs'] =  []
+                        fetched_endpoint_dict['storage_nodes'] =  []
+
+                        associated_jobs =  ScheduledJob.query.filter_by(endpoint_id=object_id).all()
+                        for job in associated_jobs:
+                            fetched_endpoint_dict['scheduled_jobs'].append({
+                                "job_id" : job.existing_job.id,
+                                "job_name": job.existing_job.name
+                            })
+                        
+                        paired_storage_nodes = ESNPair.query.filter_by(endpoint_id=object_id).all()
+                        for esnpair in  paired_storage_nodes:
+                            fetched_endpoint_dict['storage_nodes'].append({
+                                "storage_id" : esnpair.storage_node_id,
+                                "storage_name": esnpair.storage_node.name
+                            })
+                        print("ENDPOINT DICT IS", fetched_endpoint_dict)
+                        return jsonify({
+                            "response":fetched_endpoint_dict
+                        })
+                    
+                    elif object_type == "storagenode":
+                        fetched_storage_nodes = StorageNode.query.all()
+                        storagenodes = []
+                        for storagenode in fetched_storage_nodes:
+                            storagenodes.append({
+                                "storage_id" : storagenode.id,
+                                "storage_name": storagenode.name,
+                                "storage_reg_date": storagenode.created.strftime("%Y-%m-%d %H:%M:%S")
+                            })
+
+                        return jsonify({
+                            "response" : storagenodes
+                        })
+                    
+                    return jsonify({"message": "??"})
+                except Exception as e:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    line_number = exc_traceback.tb_lineno
+                    print("EXCEPTION TYPE", exc_type)
+                    print("EXCEPTION MESSAGE", exc_value)
+                    print("EXCEPTION LINE", line_number)
+                    return jsonify({
+                            "message": "Something went wrong. Contact the ZeroDown Support for help.",
+                        }),500
+        except Exception as e:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        
+
     @app.route('/zeroapi/v1/endpoint/listing/<endpoint_name>', methods=['GET'])
     def listing(endpoint_name):
         user_token= request.headers['Authorization'].split(' ')[1]

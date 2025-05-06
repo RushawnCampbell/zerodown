@@ -72,7 +72,7 @@ class Endpointmanagement(Listview):
         # Implement actual removal logic
 
     def _show_more_info(self, endpoint_name,endpoint_id):
-        SingleEndpoint(self, f"{endpoint_name} Details")
+        SingleEndpoint(self, f"{endpoint_name} Details", endpoint_id)
 
     def _toggle_tracking(self, endpoint_name):
         print(f"Tracking toggled for: {endpoint_name}")
