@@ -8,8 +8,10 @@ from frontend.views.Endpointregistration import Endpointregistration
 from frontend.views.Endpointmanagement import Endpointmanagement
 from frontend.views.Storageregistration import Storageregistration
 from frontend.views.Storagemanagement import Storagemanagement
+from frontend.views.Scheduledjobs import Scheduledjobs
 from frontend.views.Backupjob import Backupjob
 from frontend.components.Menu import Menu
+from frontend.Utility.CommonMethods import CommonMethods
 
 import sys
 
@@ -36,6 +38,7 @@ class App(gui.CTk):
         self.endpointmanagement = None
         self.storagemanagement = None
         self.storageregistration = None
+        self.scheduledjobs = None
         self.current_body_widget = None
         self.current_body_widget_name= None
         self.widget_str = None
@@ -215,9 +218,8 @@ class App(gui.CTk):
 
     def retrieve_auth_token(self):
         try:
-            service_name = self.app_name
-            username = self.windows_user
-            token = keyring.get_password(service_name, username)
+            
+            token = CommonMethods.get_token(self.app_name, self.windows_user)
             if token:
                 return token
             else:

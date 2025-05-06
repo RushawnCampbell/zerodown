@@ -10,6 +10,7 @@ class ScheduledJob(db.Model):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     job_id = db.Column(db.String(36), ForeignKey('backupjob.id'),nullable=False)
+    endpoint_id = Column(String(36), ForeignKey('endpoint.id'), nullable=False)
     frequency = db.Column(db.String(8), nullable=False)
     sch_datetime = Column(DateTime, nullable=False)
     next_sch_datetime = Column(DateTime, default=None, nullable=True)
@@ -18,11 +19,15 @@ class ScheduledJob(db.Model):
     
    
     existing_job = relationship("BackupJob", backref="jobid")
+    existing_endpoint = relationship("Endpoint", backref="endpoint_id")
 
-    def __init__(self, job_id, frequency, sch_datetime, sch_day=None):
+    def __init__(self, job_id, frequency, sch_datetime, id, endpoint_id, sch_day=None):
+        self.id = id
+        self.endpoint_id = endpoint_id
         self.job_id = job_id
         self.frequency = frequency
         self.sch_datetime =  sch_datetime
+
 
 
             

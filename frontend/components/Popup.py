@@ -27,6 +27,15 @@ class Popup(gui.CTkToplevel):
         self.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.resizable(width=False, height=False)
 
+    def set_window_position_top_centered(self, window_width, window_height):
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = 0  
+
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.resizable(width=False, height=False)
+
     def set_icon(self):
         try:
             icon_path_png = os.path.join("frontend", "assets", "icons", "zerodown.png")

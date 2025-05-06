@@ -3,6 +3,7 @@ from PIL import Image
 from frontend.components.RemoteExplorer import RemoteExplorer
 from frontend.components.JobStatus import JobStatus
 from frontend.components.ScheduleJob import ScheduleJob
+from frontend.Utility.CommonMethods import CommonMethods
 
 class Backupjob(gui.CTkFrame):
     def __init__(self, master):
@@ -50,7 +51,7 @@ class Backupjob(gui.CTkFrame):
         endpoint_label = gui.CTkLabel(self.form_frame, text="Select Endpoint")
         endpoint_label.grid(row=0, column=1, padx=(5, 20), pady=(20, 5), sticky="w")
 
-        endpoints = self.fetch_objects("endpoints")
+        endpoints = self.fetch_objects("endpoint_names")
         endpoints.insert(0, "-Select an Option-")
     
         self.endpoint_dropdown = gui.CTkComboBox(self.form_frame, values=endpoints, dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000", fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000", command=lambda selected_endpoint: self.activate_browse_button(selected_endpoint))
@@ -63,7 +64,7 @@ class Backupjob(gui.CTkFrame):
         storage_node_label = gui.CTkLabel(self.form_frame, text="Primary Storage Node")
         storage_node_label.grid(row=3, column=0, padx=(20, 5), pady=(5, 5), sticky="w")
 
-        storagenodes = self.fetch_objects("storagenodes")
+        storagenodes = self.fetch_objects("storage_names")
         storagenodes.insert(0, "-Select an Option-")
 
         self.storage_node_dropdown = gui.CTkComboBox(self.form_frame, values=storagenodes, fg_color="#2b2b2b", border_color="#2b2b2b", text_color="#000000", state=tk.DISABLED, command= lambda selected_storage: self.activate_select_destination(selected_storage))
@@ -115,23 +116,17 @@ class Backupjob(gui.CTkFrame):
         self.rowconfigure(1, weight=1)
 
     def fetch_objects(self, obj_type):
-        resource_url= f"http://127.0.0.1:8080/zeroapi/v1/objects/{obj_type}"
-        auth_token = self.master.retrieve_auth_token()
-        zeroheaders = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
-        del auth_token
         try:
-            response = requests.get( resource_url, stream=True, headers=zeroheaders)
-            response.raise_for_status()
-            object_names = response.json()
-            return object_names["names"]
-        except requests.exceptions.RequestException as e:
-            print ("ERROR IS REQUESTS", e)
-            tk.messagebox.showerror("Failed to Get Items", f"Failed to get requested items")
-            return -1
+            objects = CommonMethods.get_objects(obj_type, self.master.app_name, self.master.windows_user)
+            if objects == None:
+               tk.messagebox.showerror("Failed to Get Items", f"Failed to get requested items")
+               return objects
+            else:
+                return objects
         except Exception as e:
-            print ("ERROR IS", e)
             tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
-            return -1
+            return None
+
 
     def get_endpoint_volumes(self, endpoint_name):
         resource_url= f"http://127.0.0.1:8080/zeroapi/v1/endpoint/listing/{endpoint_name.lower()}"

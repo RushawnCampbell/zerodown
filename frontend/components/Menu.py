@@ -27,10 +27,10 @@ class Menu(gui.CTkFrame):
         self.manage_endpoints_button = gui.CTkButton(self.menu_items_frame, text="Manage Endpoints", width=button_width, command=lambda viewclassname='endpointmanagement' : self.master.show_view(viewclassname))
         self.manage_endpoints_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
-        self.manage_storage_nodes_button = gui.CTkButton(self.menu_items_frame, text="Manage Storage Nodes", width=button_width)
+        self.manage_storage_nodes_button = gui.CTkButton(self.menu_items_frame, text="Manage Storage Nodes", width=button_width, command=lambda viewclassname='storagemanagement' : self.master.show_view(viewclassname))
         self.manage_storage_nodes_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-        self.reset_tracking_button = gui.CTkButton(self.menu_items_frame, text="Manage Scheduled Jobs", width=button_width)
+        self.reset_tracking_button = gui.CTkButton(self.menu_items_frame, text="Manage Scheduled Jobs", width=button_width,  command=lambda viewclassname='scheduledjobs' : self.master.show_view(viewclassname))
         self.reset_tracking_button.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
 
         self.view_logs_button = gui.CTkButton(self.menu_items_frame, text="Reset All Storage Tracking ", width=button_width)
