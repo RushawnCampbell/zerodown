@@ -14,7 +14,7 @@ class ScheduleJob(Popup):
         self.job_name=job_name
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(6, weight=1)
+        self.grid_rowconfigure(7, weight=1) # Increased row configure to accommodate the new row
 
         self.date_label = gui.CTkLabel(self, text="Pick Backup Start Date:", text_color="#2b2b2b")
         self.date_label.grid(row=0, column=0, padx=20, pady=(20, 5), sticky="w")
@@ -59,25 +59,31 @@ class ScheduleJob(Popup):
         self.minute_label = gui.CTkLabel(self.time_picker_frame, text="Minute:")
         self.minute_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.minute_options = [f"{i:02d}" for i in range(60)]
-        self.minute_combobox = gui.CTkComboBox(self.time_picker_frame, values=self.minute_options, width=80, command=self.time_selected)
+        self.minute_combobox = gui.CTkComboBox(self.time_picker_frame, values=self.minute_options, width=100, command=self.time_selected)
         self.minute_combobox.set(f"{datetime.now().minute:02d}")
         self.minute_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
+        # Restructured Frequency and Copies row
         self.frequency_label = gui.CTkLabel(self, text="Frequency:", text_color="#2b2b2b")
         self.frequency_label.grid(row=2, column=0, padx=20, pady=(10, 5), sticky="w")
 
-        self.frequency_options = ["One Time", "Daily", "Weekly", "Monthly"]
-        self.frequency_combobox = ttk.Combobox(self, values=self.frequency_options, width=15)
+        self.frequency_combobox = ttk.Combobox(self, values=["One Time", "Daily", "Weekly", "Monthly"], width=15)
         self.frequency_combobox.set("One Time")
-        self.frequency_combobox.grid(row=2, column=1, padx=20, pady=(10, 5), sticky="e")
+        self.frequency_combobox.grid(row=2, column=0, padx=(150, 20), pady=(10, 5), sticky="w") # Placed in column 0, adjusted padx
         self.frequency_combobox.bind("<<ComboboxSelected>>", self.frequency_generator)
+
+        self.num_copies_label = gui.CTkLabel(self, text="No. of Copies to Keep:", text_color="#2b2b2b")
+        self.num_copies_label.grid(row=2, column=1, padx=(20, 0), pady=(10, 5), sticky="w")
+
+        self.num_copies_entry = gui.CTkEntry(self, width=90, fg_color="#FFFFFF", text_color="#2b2b2b", border_width=1, height=10, border_color="#000000", corner_radius=0)
+        self.num_copies_entry.grid(row=2, column=1, padx=(170, 20), pady=(10, 5), sticky="w") # Placed in column 1, adjusted padx
 
         self.weekly_buttons_frame = None
         self.selected_day = tk.StringVar()
         self.selected_day.set(None)
 
         self.schedule_button = gui.CTkButton(self, text="Schedule Job", command=self.configure_schedule)
-        self.schedule_button.grid(row=5, column=0, columnspan=2, pady=20, sticky="s")
+        self.schedule_button.grid(row=6, column=0, columnspan=2, pady=20, sticky="s") # Moved down due to new row
 
         self.after(1000, self.set_window_position, 700, 350)
 
@@ -121,7 +127,7 @@ class ScheduleJob(Popup):
         if self.weekly_buttons_frame:
             self.weekly_buttons_frame.destroy()
             self.weekly_buttons_frame = None
-            self.schedule_button.grid(row=5, column=0, columnspan=2, pady=20, sticky="s")
+            self.schedule_button.grid(row=6, column=0, columnspan=2, pady=20, sticky="s") # Moved down
 
         if selected_frequency == "Weekly":
             self.weekly_buttons_frame = gui.CTkFrame(self)
@@ -138,7 +144,7 @@ class ScheduleJob(Popup):
                 )
                 day_radio.pack(side="left", padx=0)
 
-            self.schedule_button.grid(row=4, column=0, columnspan=2, pady=(10, 20), sticky="s")
+            self.schedule_button.grid(row=5, column=0, columnspan=2, pady=(10, 20), sticky="s") # Moved down
 
             self.update_idletasks()
             self.update()
@@ -146,11 +152,12 @@ class ScheduleJob(Popup):
     def configure_schedule(self):
         selected_frequency = self.frequency_combobox.get()
         selected_day_abbr = self.selected_day.get()
+        num_archive_copies = self.num_copies_entry.get()
 
         if selected_frequency == "Weekly":
             if selected_day_abbr == "None" or selected_day_abbr == "":
                 tk.messagebox.showerror("No Selected Day", "You Must Select A Day For Your Weekly Backups")
-                return -1  # Indicate failure
+                return None  # Indicate failure
 
             selected_date_str = self.calendar.get_date()
             try:
@@ -165,11 +172,17 @@ class ScheduleJob(Popup):
                         "Day Mismatch",
                         f"The selected day ({selected_full_day}) does not match the date on the calendar ({selected_weekday}). Please adjust either the selected day or the calendar date."
                     )
-                    return -1  # Indicate failure
+                    return None
             except ValueError:
-                tk.messagebox.showerror("Error", "Could not parse the calendar date.")
-                return -1
+                tk.messagebox.showerror("Calendar Error", "Could not parse the calendar date.")
+                return None
 
+
+        if not num_archive_copies.isdigit() or int(num_archive_copies) < 1:
+            tk.messagebox.showerror("Value Error", "The number of copies to keep is invalid. You must enter a number greater than 0, please try again.")
+            return None
+        else:
+            self.master.num_copies_to_keep = int(num_archive_copies)
         # Get the final datetime object
         schedule_datetime = None
         if self.master.sch_datetime is None:
@@ -186,49 +199,69 @@ class ScheduleJob(Popup):
                 default_hour_24hr = f"{hour:02d}"
                 default_date = datetime.strptime(default_date_str, "%Y-%m-%d").date()
                 schedule_datetime = datetime(default_date.year, default_date.month, default_date.day,
-                                                     int(default_hour_24hr), int(default_minute))
+                                                    int(default_hour_24hr), int(default_minute))
             except ValueError:
                 tk.messagebox.showerror("Error", "Could not determine default date and time.")
                 return -1
         else:
             schedule_datetime = datetime.strptime(self.master.sch_datetime, "%Y-%m-%d %H:%M:%S")
 
-        # Format the time for the confirmation message in 12-hour AM/PM format
+        # time in 12-hour AM/PM format
         formatted_time = schedule_datetime.strftime("%I:%M %p")
 
-        # Prepare the confirmation message
         confirmation_message = f"Would You to Continue With The Following Schedule?\n\nStart Date: {schedule_datetime.strftime('%Y-%m-%d')}\nStart Time: {formatted_time}\nFrequency: {selected_frequency}"
         if selected_frequency == "Weekly" and selected_day_abbr:
             days_map = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
             confirmation_message += f"\nDay: {days_map.get(selected_day_abbr)}s"
+        if num_archive_copies:
+            confirmation_message += f"\nNumber of Archive Copies: {num_archive_copies}"
 
         if tk.messagebox.askyesno("Schedule Confirmation", confirmation_message):
             self.master.sch_frequency = selected_frequency
             if selected_frequency == "Weekly":
                 self.master.sch_day = selected_day_abbr
             self.master.sch_datetime = schedule_datetime.strftime("%Y-%m-%d %H:%M:%S") # Store as string for consistency
+            try:
+                self.master.num_archive_copies = int(num_archive_copies) if num_archive_copies else None
+            except ValueError:
+                tk.messagebox.showerror("Input Error", "Number of archive copies must be an integer.")
+                return -1
+
             self.create_schedule()
             return 0  # Indicate success
         else:
             return -1  # Indicate cancellation
-        
+
     def create_schedule(self):
         resource_url= f"http://127.0.0.1:8080/zeroapi/v1/backup/schedule"
         zauth_token = self.master.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
+        schedule_data = {
+            "endpoint_name": self.master.endpoint_name,
+            "backup_targets": self.master.selected_endpoint_info,
+            "backup_destinations": self.master.selected_storage_info,
+            "name": self.job_name,
+            "sch_datetime": self.master.sch_datetime,
+            "sch_frequency": self.master.sch_frequency,
+            "sch_day": self.master.sch_day,
+            "num_archive_copies" : self.master.num_archive_copies
+        }
+        if hasattr(self.master, 'num_archive_copies') and self.master.num_archive_copies is not None:
+            schedule_data["num_archive_copies"] = self.master.num_archive_copies
+
         try:
-            response = requests.post( resource_url, stream=True, headers=zeroheaders, json={"endpoint_name" : self.master.endpoint_name, "backup_targets": self.master.selected_endpoint_info, "backup_destinations": self.master.selected_storage_info, "name": self.job_name, "sch_datetime" : self.master.sch_datetime, "sch_frequency": self.master.sch_frequency, "sch_day": self.master.sch_day})
+            response = requests.post(resource_url, stream=True, headers=zeroheaders, json=schedule_data)
             response.raise_for_status()
             response_code = response.status_code
             response= response.json()
             schedule_status = response['response']
 
             if response_code == 200:
-                 self.unfade_app()
-                 self.destroy()
-                 tk.messagebox.showinfo("Scheduling Successful", f"{self.job_name} Was Scheduled Successfully")
+                self.unfade_app()
+                self.destroy()
+                tk.messagebox.showinfo("Scheduling Successful", f"{self.job_name} Was Scheduled Successfully")
             else:
                 tk.messagebox.showerror("Scheduling Error", f"{schedule_status}. Contact ZeroDown Support If The Error Persists.")
-    
+
         except requests.exceptions.RequestException as e:
             tk.messagebox.showerror("Scheduling Error", f"An Unexpected Error Occurred. Please Try Again or Contact ZeroDown Support If The Error Persists.")

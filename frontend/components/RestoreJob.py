@@ -6,9 +6,10 @@ from frontend.components.Popup import Popup
 from PIL import Image
 
 class RestoreJob(Popup):
-    def __init__(self, master, title):
+    def __init__(self, master, title, job_id):
         super().__init__(master, title)
         self.master = master
+        self.job_id = job_id
         self.status_label= None
         self.is_complete = False  
         self.configure_body()
@@ -26,7 +27,7 @@ class RestoreJob(Popup):
         gif_label = gui.CTkLabel(main_frame, text="")
         gif_label.pack(pady=(0, 5))
 
-        status_text = f"Restoring"
+        status_text = f"Restoring "
         self.status_label = gui.CTkLabel(main_frame, text=status_text)
         self.status_label.pack(pady=(5, 0))
         self.status_label.configure(text_color="#1fa59d")

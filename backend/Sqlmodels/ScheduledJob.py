@@ -15,18 +15,25 @@ class ScheduledJob(db.Model):
     sch_datetime = Column(DateTime, nullable=False)
     next_sch_datetime = Column(DateTime, default=None, nullable=True)
     sch_day = db.Column(db.String(9), default=None, nullable=True)
+    num_archive_copies = db.Column(db.Integer(), default=1, nullable=False)
+    num_copies_on_storage = db.Column(db.Integer(), default=0, nullable=False)
+    last_copy_n =db.Column(db.String(255), default=None, nullable=True)
+
     created = Column(DateTime, default=lambda: datetime.now())
     
    
     existing_job = relationship("BackupJob", backref="jobid")
     existing_endpoint = relationship("Endpoint", backref="endpoint_id")
 
-    def __init__(self, job_id, frequency, sch_datetime, id, endpoint_id, sch_day=None):
+    def __init__(self, job_id, frequency, sch_datetime, id, endpoint_id, sch_day=None, num_archive_copies=1, last_copy_name=None):
         self.id = id
         self.endpoint_id = endpoint_id
         self.job_id = job_id
         self.frequency = frequency
         self.sch_datetime =  sch_datetime
+        self.sch_day = sch_day
+        self.num_archive_copies =  num_archive_copies
+        self.last_copy_name = last_copy_name
 
 
 

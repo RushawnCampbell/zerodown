@@ -25,6 +25,7 @@ class Backupjob(gui.CTkFrame):
         self.sch_datetime = None
         self.sch_frequency = None
         self.sch_day =  None
+        self.num_archive_copies = 1
         self.virtual_machines = ["VM 1", "VM 2", "VM 3", "VM 4"]
         self.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
 
