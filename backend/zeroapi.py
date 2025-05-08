@@ -795,8 +795,9 @@ class Zeroapi:
                                 Zeroapi.backup_with_success[job_id] = [vol]
                             with app.app_context():
                                 fetched_backup = BackupJob.query.filter_by(id=job_id).first()
-                                fetched_backup.last_backup=backup_time
-                                db.session.commit()
+                                if fetched_backup:
+                                    fetched_backup.last_backup=backup_time
+                                    db.session.commit()
                         else:
                             if job_id in Zeroapi.backup_with_errors:
                                 Zeroapi.backup_with_errors[job_id].append(vol)
@@ -828,24 +829,18 @@ class Zeroapi:
             storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
             storage_client.connect(hostname=storage_node_ip, username=storage_node_username, port=22, pkey=pkey)
 
-            fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
-            num_archive_copies = fetched_schedule.num_archive_copies
-            num_copies_on_storage= fetched_schedule.num_copies_on_storage
-            last_copy_name = fetched_schedule.last_copy_name
-            if  num_copies_on_storage == num_archive_copies:
-
-
             threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, remote_folder, selected_storage_volumes, job_id)).start()
             
-
             job = scheduler.get_job(f"{job_id}:{sch_id}")
             if job:
                 trigger_type= job.trigger.__class__.__name__
                 if trigger_type == "CronTrigger":
                     next_backup_time = job.next_run_time
+                    fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
                     fetched_schedule.next_sch_datetime = next_backup_time
                     db.session.commit() 
             else:
+                fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
                 fetched_backup_job = BackupJob.query.filter_by(id=fetched_schedule.existing_job.id).first()
                 db.session.delete(fetched_schedule)
                 db.session.flush()

@@ -17,7 +17,7 @@ class ScheduledJob(db.Model):
     sch_day = db.Column(db.String(9), default=None, nullable=True)
     num_archive_copies = db.Column(db.Integer(), default=1, nullable=False)
     num_copies_on_storage = db.Column(db.Integer(), default=0, nullable=False)
-    last_copy_n =db.Column(db.String(255), default=None, nullable=True)
+    last_copy_name =db.Column(db.String(255), default=None, nullable=True)
 
     created = Column(DateTime, default=lambda: datetime.now())
     
