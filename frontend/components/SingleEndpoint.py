@@ -75,13 +75,7 @@ class SingleEndpoint(Popup):
             pass
 
     def restore_job(self, job_id):
-        restore_confirmation = messagebox.askyesno(
-            "Confirm Endpoint Restoration",
-            f"Are you sure you"
-        )
         restore_window = RestoreJob(self, "Restore Job", job_id)
-        restore_window.grab_set()
-        self.wait_window(restore_window)
 
     def _populate_scheduled_jobs(self):
         # Clear existing widgets in the frame

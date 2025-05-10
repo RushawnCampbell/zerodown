@@ -8,10 +8,8 @@ from .Sqlmodels.ZeroCryptor import ZeroCryptor
 from .Sqlmodels.ESNPair import ESNPair
 from .Sqlmodels.BackupJob import BackupJob
 from .Sqlmodels.ScheduledJob import ScheduledJob
-import os, sys,jwt, logging, paramiko, uuid
+import os, sys,jwt, logging, paramiko, uuid, time, json, ast, threading
 from datetime import datetime, timezone
-import time
-import threading
 
 class Zeroapi:
     backup_in_progress = 0
@@ -523,15 +521,15 @@ class Zeroapi:
                 esnpair_id = isexists_esn_pair_id
     
             selected_storage_volumes = data.get('backup_destinations')
-            remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
+            remote_folder = [f"C:\\Users\\{endpoint_username}\\Desktop"]
             job_id = str(uuid.uuid4())
     
    
-            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, remote_folder, selected_storage_volumes, job_id)).start()
-            #job_name = data.get('name')
-            #backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
-            #db.session.add(backupjob)
-            #db.session.commit()
+            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, selected_storage_volumes, job_id, None, remote_folder)).start()
+            job_name = data.get('name')
+            backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
+            db.session.add(backupjob)
+            db.session.commit()
             return jsonify({"in_progress": len(selected_storage_volumes), "job_id":job_id }), 200
     
         except Exception as e:
@@ -680,17 +678,38 @@ class Zeroapi:
 
     #UTILITY FUNCTIONS
     @staticmethod
-    def run_backup(storage_client, endpoint_username, endpoint_ip, commands):
+    def run_backup(storage_client, endpoint_username, endpoint_ip, commands, sch_obj=None, destination_folder_name=None,  destination_folder_root=None):
         try:
+            num_archive_copies = 0
+            num_copies_on_storage = 0
+            if sch_obj:
+                num_archive_copies = sch_obj.num_archive_copies
+                num_copies_on_storage = sch_obj.num_copies_on_storage
+                archive_queue_string = sch_obj.archive_queue
+                archive_queue = ast.literal_eval(archive_queue_string)
+                if num_copies_on_storage == num_archive_copies:
+                    copy_to_remove = archive_queue[1]
+                    command= fr"Remove-Item -Path '{destination_folder_root}/{copy_to_remove}' -Force -Recurse"
+                    stdin, stdout, stderr = storage_client.exec_command(fr'powershell.exe -ExecutionPolicy Bypass -Command "{command}"')
+                    if not stderr:
+                        archive_queue = archive_queue.pop(1)
+                        sch_obj.archive_queue = archive_queue
+                        db.session.commit()
+                else:
+                    archive_queue.append(destination_folder_name)
+                    sch_obj.archive_queue = str(archive_queue)
+                    db.session.commit()
+
             command = f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
             stdin, stdout, stderr = storage_client.exec_command(command)
 
             output = ""
             error_output = ""
+            
             for cmd in commands:
                 stdin.write(cmd + "\n")
                 stdin.flush()
-                time.sleep(0.1)  
+                time.sleep(0.5)  
 
             stdin.close()  
 
@@ -699,10 +718,22 @@ class Zeroapi:
                     output += stdout.read().decode()
                 if stderr.channel.recv_ready():
                     error_output += stderr.read().decode()
-                time.sleep(0.1)
+                time.sleep(0.5)
 
             exit_code = stdout.channel.recv_exit_status()
+            
             storage_client.close()
+
+            print("SFTP Output:", output)
+            print("SFTP Error Output:", error_output)
+            print("SFTP Exit Code:", exit_code)
+
+            if exit_code == 0:
+                if sch_obj:
+                    num_copies_on_storage+=1
+                    sch_obj.num_copies_on_storage= num_copies_on_storage
+                    db.session.commit()
+
             return output, error_output, exit_code
 
         except Exception as e:
@@ -758,6 +789,8 @@ class Zeroapi:
             
     @staticmethod
     def handle_sftp_result(output, error_output, backup_exit_code):
+       print("OUTPUT IN HANDLE IS", output)
+       print("ERROR IN HANDLE IS", error_output)
        if backup_exit_code == 0 and not error_output:
            print("BACKUP WAS SUCCESSSSSSSS!")
            return backup_exit_code
@@ -766,8 +799,9 @@ class Zeroapi:
            return -1
        
     @staticmethod
-    def run_backup_thread(storage_client, endpoint_username, endpoint_ip, remote_folder,selected_storage_volumes, job_id):
+    def run_backup_thread(storage_client, endpoint_username, endpoint_ip,selected_storage_volumes, job_id, sch_id, backup_paths):
         with app.app_context():
+            sch_obj= ScheduledJob.query.filter_by(id=sch_id).first()
             fetched_job = BackupJob.query.filter_by(id=job_id).first()
             fetched_job_name = fetched_job.name.replace(" ","")
             fetched_job_esnpair = fetched_job.esnpair
@@ -775,19 +809,31 @@ class Zeroapi:
             if isexist:
                 if "Volumes" in selected_storage_volumes:
                     backup_time = datetime.now()
-                    current_datetime= datetime.now().strftime("%H:%M:%S")
+                    #current_datetime= datetime.now().strftime("%H:%M:%S")
                     selected_storage_volumes_list = selected_storage_volumes['Volumes'].keys()
                     for vol in selected_storage_volumes_list:
-                        backup_destination = f'{vol}\\{fetched_job_name}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}\\'
-                        command =  f'mkdir {backup_destination}'
+                        destination_folder_name = f'{fetched_job_name}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
+                        destination_folder_path = fr'{vol}/{destination_folder_name}/'
+                        destination_folder_root =  fr'{vol}/'
+                        command =  f'mkdir {destination_folder_path}'
                         stdin, stdout, stderr = storage_client.exec_command(command)
-                        sftp_commands = [
-                            f'get -r {remote_folder} {backup_destination}',
-                            'bye'
-                        ]
-                        output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands)
-                        result = Zeroapi.handle_sftp_result(output, error_output, backup_exit_code)
+                        sftp_commands =[]
+                        
+                        for path in backup_paths:
+                            if path not in sftp_commands:
+                                #sftp_commands.append( 'get -r ' + path.replace("\\", "/") +' '+backup_destination.replace("\\", "/"))
+                                sftp_commands.append( fr'get -r "{path}" "{destination_folder_path}"')
+                        sftp_commands.append('bye')
 
+                        if sch_obj:
+                            if sch_obj.frequency == "One Time":
+                                output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands, sch_obj=None, destination_folder_name=None, destination_folder_root=None)
+                            else:   
+                                output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands, sch_obj=sch_obj, destination_folder_name=destination_folder_name, destination_folder_root=destination_folder_root)
+                        else:
+                            output, error_output, backup_exit_code = Zeroapi.run_backup(storage_client, endpoint_username, endpoint_ip, sftp_commands, sch_obj=None, destination_folder_name=None, destination_folder_root=None)
+                        result = Zeroapi.handle_sftp_result(output, error_output, backup_exit_code)
+                       
                         if result == 0:
                             if job_id in Zeroapi.backup_with_success:
                                 Zeroapi.backup_with_success[job_id].append(vol)
@@ -814,37 +860,91 @@ class Zeroapi:
 
         with app.app_context():
             zcryptobj = ZeroCryptor()
-            backupjob = BackupJob.query.filter_by(id=job_id).first()
-            storage_node_ip = backupjob.esn_pair.storage_node.ip
+            fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
+            storage_node_ip = fetched_schedule.existing_job.esn_pair.storage_node.ip
             storage_node_ip = zcryptobj._decrypt_data(encrypted_data=storage_node_ip, type="STORAGE")
-            storage_node_username = backupjob.esn_pair.storage_node.username
-            endpoint_username = backupjob.esn_pair.endpoint.username
-            endpoint_ip = backupjob.esn_pair.endpoint.ip
+            storage_node_username =  fetched_schedule.existing_job.esn_pair.storage_node.username
+            endpoint_username =   fetched_schedule.existing_job.esn_pair.endpoint.username
+            endpoint_ip =   fetched_schedule.existing_job.esn_pair.endpoint.ip
             endpoint_ip = zcryptobj._decrypt_data(encrypted_data=endpoint_ip, type="ENDPOINT")
             remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
 
             pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+
             storage_client = paramiko.SSHClient()
             storage_client.load_system_host_keys()
             storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
             storage_client.connect(hostname=storage_node_ip, username=storage_node_username, port=22, pkey=pkey)
 
-            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, remote_folder, selected_storage_volumes, job_id)).start()
+            endpoint_client=paramiko.SSHClient()
+            endpoint_client.load_system_host_keys()
+            endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+            endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
+            
+
+            #command =  f"$fileInfo = @{{}}; Get-ChildItem -Path \"{remote_folder}\" -Recurse | Where-Object {{ ! $_.PSIsContainer }} | ForEach-Object {{ $hash = Get-FileHash -Path $_.FullName -Algorithm SHA1 | Select-Object -ExpandProperty Hash; $fileInfo[$_.FullName] = @{{'LastModified'=$_.LastWriteTime.ToString('M/d/yyyy HH:mm:ss'); 'SHA1Hash'=$hash}} }}; $fileInfo | ConvertTo-Json"
+            command= f"$fileInfo = @{{}}; Get-ChildItem -Path \"{remote_folder}\" -Recurse | ForEach-Object {{ $itemPath = $_.FullName; $itemInfo = @{{'LastModified'=$_.LastWriteTime.ToString('M/d/yyyy HH:mm:ss')}}; if ($_.PSIsContainer) {{ $itemInfo['Type'] = 'Folder' }} else {{ $itemInfo['Type'] = 'File'; $hash = Get-FileHash -Path $_.FullName -Algorithm SHA1 | Select-Object -ExpandProperty Hash; $itemInfo['SHA1Hash'] = $hash }}; $fileInfo[$itemPath] = $itemInfo }}; $fileInfo | ConvertTo-Json"
+            _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+            output = stdout.read().decode('utf-8').strip()
+            error = stderr.read().decode('utf-8').strip()
+            
+            file_info = json.loads(output)
+            job_name =  fetched_schedule.existing_job.name
+            schedule_created_date =  fetched_schedule.created.strftime("%Y-%m-%d_%H-%M-%S")
+            archive_queue =  fetched_schedule.archive_queue
+            modded_files=[]
+            next_increment_config= {}
+
+            if archive_queue != '[]' and archive_queue:
+                config_file_path= os.path.join("backend", "configurations", f"{job_name}_{schedule_created_date}_next_increment.json")
+                if os.path.exists( config_file_path):
+                    with open(config_file_path, 'r') as f:
+                        stored_increment_content = json.load(f)
+                    for path, metainfo in file_info.items():
+                        parent_dir = os.path.dirname(path)
+                        if parent_dir in file_info:
+                            continue
+                        if path in stored_increment_content:
+                            if metainfo.get('Type') == 'File':
+                                if metainfo.get('SHA1Hash') != stored_increment_content[path]['SHA1Hash']  or metainfo.get('LastModified') != stored_increment_content.get('LastModified'):
+                                    next_increment_config[path] = metainfo
+                                    modded_files.append(path.replace("\\\\", "/"))
+                            elif metainfo.get('Type') == 'Folder':
+                                if metainfo['LastModified'] != stored_increment_content[path].get('LastModified'):
+                                    modded_files.append(path.replace("\\\\", "/"))
+                                    next_increment_config[path] = metainfo
+                    
+                    with open(config_file_path, 'w') as wf:
+                        json.dumps(next_increment_config, wf, indent=4)
+        
+                else:
+                    with open(config_file_path, "w") as f:
+                        json.dump(file_info, f, indent=4)
+            else:
+                config_file_path= os.path.join("backend", "configurations", f"{job_name}_{schedule_created_date}_full.json")
+                with open(config_file_path, "w") as f:
+                    json.dump(file_info, f, indent=4)
+
+                for path, metainfo in file_info.items():
+                    parent_dir = os.path.dirname(path)
+                    if parent_dir in file_info:
+                        continue
+                    modded_files.append(path.replace("\\\\", "/"))
+
+            threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, selected_storage_volumes, job_id, sch_id, modded_files)).start()
             
             job = scheduler.get_job(f"{job_id}:{sch_id}")
             if job:
                 trigger_type= job.trigger.__class__.__name__
                 if trigger_type == "CronTrigger":
                     next_backup_time = job.next_run_time
-                    fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
                     fetched_schedule.next_sch_datetime = next_backup_time
                     db.session.commit() 
             else:
                 fetched_schedule = ScheduledJob.query.filter_by(id=sch_id).first()
-                fetched_backup_job = BackupJob.query.filter_by(id=fetched_schedule.existing_job.id).first()
                 db.session.delete(fetched_schedule)
                 db.session.flush()
-                db.session.delete(fetched_backup_job)
+                db.session.delete(fetched_schedule.existing_job)
                 db.session.commit() 
         
     @staticmethod

@@ -209,7 +209,7 @@ class ScheduleJob(Popup):
         # time in 12-hour AM/PM format
         formatted_time = schedule_datetime.strftime("%I:%M %p")
 
-        confirmation_message = f"Would You to Continue With The Following Schedule?\n\nStart Date: {schedule_datetime.strftime('%Y-%m-%d')}\nStart Time: {formatted_time}\nFrequency: {selected_frequency}"
+        confirmation_message = f"Would You Like To Continue With The Following Schedule?\n\nStart Date: {schedule_datetime.strftime('%Y-%m-%d')}\nStart Time: {formatted_time}\nFrequency: {selected_frequency}"
         if selected_frequency == "Weekly" and selected_day_abbr:
             days_map = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
             confirmation_message += f"\nDay: {days_map.get(selected_day_abbr)}s"
@@ -257,9 +257,15 @@ class ScheduleJob(Popup):
             schedule_status = response['response']
 
             if response_code == 200:
+                self.master.sch_datetime = ""
+                self.master.num_copies_to_keep =0
+                self.master.sch_frequency = ""
+                self.master.num_archive_copies = 0
+                self.master.sch_day = ""
                 self.unfade_app()
-                self.destroy()
                 tk.messagebox.showinfo("Scheduling Successful", f"{self.job_name} Was Scheduled Successfully")
+                self.master.master.route_home()
+                self.destroy()
             else:
                 tk.messagebox.showerror("Scheduling Error", f"{schedule_status}. Contact ZeroDown Support If The Error Persists.")
 
