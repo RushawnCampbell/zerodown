@@ -30,9 +30,9 @@ class Homeview(gui.CTkFrame):
         self.recent_frame = gui.CTkScrollableFrame(self, width=850, height=80) # Further reduced height
         self.recent_frame.grid(row=1, column=0, padx=40, pady=(2, 2), sticky="ew")
         self.recent_frame.configure(fg_color="#000000")
-        self.sample_data = [ {"time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Daily files backup", "level": "Full"},
-    {"time": (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "type": "Database", "description": "Weekly database dump", "level": "Differential"},
-    {"time": (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"), "type": "System", "description": "Monthly full system check with a very long description that should wrap within the allocated width", "level": "Informational"},] # Initialize as empty list
+        self.sample_data = [ {"time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Weekly backup failed after 3 retries; Endpoint could not be reached.", "level": "Error"},
+                            {"time": (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Daily backup was successful", "level": "Info"},
+                            {"time": (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"), "type": "Storage", "description": "Storage Node Alpha is running low", "level": "Warning"},] # Initialize as empty list
         self.recent_no_data_label = None
 
         # Storage Nodes Label
@@ -42,9 +42,9 @@ class Homeview(gui.CTkFrame):
         self.storage_frame = gui.CTkScrollableFrame(self, width=850, height=40) # Further reduced height
         self.storage_frame.grid(row=3, column=0, padx=40, pady=(2, 8), sticky="ew")
         self.storage_frame.configure(fg_color="#202020")
-        self.sample_storage_data = [{"Storage Node": "Server A", "Used Storage": "500 GB", "Available Storage": "1 TB"},
-    {"Storage Node": "NAS Unit 1", "Used Storage": "2 TB", "Available Storage": "5 TB"},
-    {"Storage Node": "Cloud Backup", "Used Storage": "100 GB", "Available Storage": "Unlimited"}] # Initialize as empty list
+        self.sample_storage_data = [{"Storage Node": "Alpha", "Used Storage": "950.18 GB", "Available Storage": "1 TB"},
+                                    {"Storage Node": "NAS Unit 1", "Used Storage": "2 TB", "Available Storage": "5 TB"},
+                                    {"Storage Node": "Cloud Backup", "Used Storage": "100 GB", "Available Storage": "Unlimited"}] # Initialize as empty list
         self.storage_no_data_label = None
         self.storage_add_button = None
 
@@ -107,23 +107,53 @@ class Homeview(gui.CTkFrame):
         if data_list:
             description_width = 60 # Character limit before wrapping
 
-            gui.CTkLabel(self.recent_frame, text="Time", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, padx=10, pady=(10, 3), sticky="ew")
-            gui.CTkLabel(self.recent_frame, text="Type", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=1, padx=10, pady=(10, 3), sticky="ew")
-            gui.CTkLabel(self.recent_frame, text="Description", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=2, padx=10, pady=(10, 3), sticky="ew")
-            gui.CTkLabel(self.recent_frame, text="Level", font=gui.CTkFont(weight="bold"), anchor="e").grid(row=0, column=3, padx=10, pady=(10, 3), sticky="ew")
+            gui.CTkLabel(self.recent_frame, text="Time", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, padx=(10, 5), pady=(10, 3), sticky="ew")
+            gui.CTkLabel(self.recent_frame, text="Type", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=1, padx=(5, 5), pady=(10, 3), sticky="ew")
+            gui.CTkLabel(self.recent_frame, text="Description", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=2, padx=(5, 5), pady=(10, 3), sticky="ew")
+            gui.CTkLabel(self.recent_frame, text="Level", font=gui.CTkFont(weight="bold"), anchor="w").grid(row=0, column=3, padx=(5, 10), pady=(10, 3), sticky="ew")
 
             for i, data in enumerate(data_list):
                 if row_limit is not None and i >= row_limit:
                     break
                 row_num = i + 1
-                gui.CTkLabel(self.recent_frame, text=data["time"], anchor="w").grid(row=row_num, column=0, padx=10, pady=2, sticky="ew")
-                gui.CTkLabel(self.recent_frame, text=data["type"], anchor="w").grid(row=row_num, column=1, padx=10, pady=2, sticky="ew")
+
+                row_color = self.recent_frame.cget("fg_color") # Default background color
+                text_color = "white" # Default text color
+                level_text_color = "black"
+
+                if data["level"].lower() == "warning":
+                    row_color = "#ffe0b3"  # Light orange for warning
+                    text_color = "#cc3300"
+                    level_text_color = "#cc3300"
+                elif data["level"].lower() == "info":
+                    row_color = "#deebff"  # Light blue for info
+                    text_color = "blue"
+                    level_text_color = "blue"
+                elif data["level"].lower() == "error":
+                    row_color = "#ffdddd"  # Light red for error
+                    text_color = "red"
+                    level_text_color = "red"
+
+                gui.CTkLabel(self.recent_frame, text=data["time"], anchor="w", text_color=text_color, fg_color=row_color).grid(row=row_num, column=0, padx=(10, 5), pady=2, sticky="ew")
+                gui.CTkLabel(self.recent_frame, text=data["type"], anchor="w", text_color=text_color, fg_color=row_color).grid(row=row_num, column=1, padx=(5, 5), pady=2, sticky="ew")
 
                 wrapped_description = textwrap.fill(data["description"], width=description_width)
-                gui.CTkLabel(self.recent_frame, text=wrapped_description, anchor="w", justify="left").grid(row=row_num, column=2, padx=10, pady=2, sticky="ew")
+                gui.CTkLabel(self.recent_frame, text=wrapped_description, anchor="w", justify="left", text_color=text_color, fg_color=row_color).grid(row=row_num, column=2, padx=(5, 5), pady=2, sticky="ew")
 
-                gui.CTkLabel(self.recent_frame, text=data["level"], anchor="e").grid(row=row_num, column=3, padx=10, pady=2, sticky="ew")
+                gui.CTkLabel(self.recent_frame, text=data["level"], anchor="w", text_color=level_text_color, fg_color=row_color).grid(row=row_num, column=3, padx=(5, 10), pady=2, sticky="ew")
 
+                # Configure row background color
+                self.recent_frame.grid_rowconfigure(row_num, weight=0)
+                self.recent_frame.grid_columnconfigure(0, weight=1)
+                self.recent_frame.grid_columnconfigure(1, weight=1)
+                self.recent_frame.grid_columnconfigure(2, weight=3)
+                self.recent_frame.grid_columnconfigure(3, weight=1)
+
+                # Add a transparent separator to simulate row background
+                separator = gui.CTkFrame(self.recent_frame, fg_color=row_color, height=1)
+                separator.grid(row=row_num + 1, column=0, columnspan=4, sticky="ew", padx=5, pady=(0, 1))
+
+            # Configure column weights for the heading row
             self.recent_frame.grid_columnconfigure(0, weight=1) # Time
             self.recent_frame.grid_columnconfigure(1, weight=1) # Type
             self.recent_frame.grid_columnconfigure(2, weight=3) # Description
@@ -174,13 +204,4 @@ class Homeview(gui.CTkFrame):
         print(f"Managing job: {job_name}")
 
 """ sample_data = [
-    {"time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Daily files backup", "level": "Full"},
-    {"time": (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "type": "Database", "description": "Weekly database dump", "level": "Differential"},
-    {"time": (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"), "type": "System", "description": "Monthly full system check with a very long description that should wrap within the allocated width", "level": "Informational"},
-]
-  sample_storage_data = [
-    {"Storage Node": "Server A", "Used Storage": "500 GB", "Available Storage": "1 TB"},
-    {"Storage Node": "NAS Unit 1", "Used Storage": "2 TB", "Available Storage": "5 TB"},
-    {"Storage Node": "Cloud Backup", "Used Storage": "100 GB", "Available Storage": "Unlimited"},
-]
-"""
+    {"time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": "Backup", "description": "Daily files backup", "level": "Full"},"""

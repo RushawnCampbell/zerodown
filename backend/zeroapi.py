@@ -9,7 +9,7 @@ from .Sqlmodels.ESNPair import ESNPair
 from .Sqlmodels.BackupJob import BackupJob
 from .Sqlmodels.ScheduledJob import ScheduledJob
 import os, sys,jwt, logging, paramiko, uuid, time, json, ast, threading
-from datetime import datetime, timezone
+from datetime import datetime
 
 class Zeroapi:
     backup_in_progress = 0
@@ -465,23 +465,6 @@ class Zeroapi:
             }),500
 
 
-    @app.route('/zeroapi/v1/backup/restore', methods=['POST'])
-    def restore():
-        user_token= request.headers['Authorization'].split(' ')[1]
-        if not user_token:
-            return jsonify({"message": "Access token is missing or invalid"}),401
-        try:
-            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            namepart= decoded['sub'].lower()
-            fetched_user = User.query.filter_by(username=namepart).first()
-            if namepart == fetched_user.username.lower():
-                data = request.get_json()
-
-        except Exception as e:
-            print(e)
-            return jsonify({"response":  -1}),500
-        
-
     @app.route('/zeroapi/v1/backup/first_time', methods=['POST'])
     def first_time():
         user_token = request.headers.get('Authorization', '').split(' ')[-1]
@@ -521,7 +504,9 @@ class Zeroapi:
                 esnpair_id = isexists_esn_pair_id
     
             selected_storage_volumes = data.get('backup_destinations')
-            remote_folder = [f"C:\\Users\\{endpoint_username}\\Desktop"]
+            remote_folder_path= f"C:/Users/{endpoint_username}/Desktop"
+            remote_folder_name = remote_folder_path.split("/")[-1]
+            remote_folder = [ remote_folder_name, remote_folder_path ]
             job_id = str(uuid.uuid4())
     
    
@@ -688,13 +673,32 @@ class Zeroapi:
                 archive_queue_string = sch_obj.archive_queue
                 archive_queue = ast.literal_eval(archive_queue_string)
                 if num_copies_on_storage == num_archive_copies:
-                    copy_to_remove = archive_queue[1]
-                    command= fr"Remove-Item -Path '{destination_folder_root}/{copy_to_remove}' -Force -Recurse"
-                    stdin, stdout, stderr = storage_client.exec_command(fr'powershell.exe -ExecutionPolicy Bypass -Command "{command}"')
-                    if not stderr:
-                        archive_queue = archive_queue.pop(1)
-                        sch_obj.archive_queue = archive_queue
-                        db.session.commit()
+                    full_copy_name=  archive_queue[0]
+                    copy_to_remove_name = archive_queue[1]
+
+                    full_copy_path = fr'{destination_folder_root}/{full_copy_name}'
+                    copy_to_remove_path = fr'{destination_folder_root}/{copy_to_remove_name}'
+
+                    merge_command = fr"Get-ChildItem -Path '{copy_to_remove_path}' -Recurse | Copy-Item -Destination '{full_copy_path}' -Force"
+                    remove_command= fr"Remove-Item -Path '{copy_to_remove_path}' -Force -Recurse"
+
+                    stdin, stdout, stderr = storage_client.exec_command(fr'powershell.exe -ExecutionPolicy Bypass -Command "{merge_command}"')
+                    exit_status = stdout.channel.recv_exit_status()
+                    if exit_status == 0:
+                        print(f"Successfully merged contents from '{copy_to_remove_path}' to '{full_copy_path}'.")
+                        stdin, stdout, stderr = storage_client.exec_command(fr'powershell.exe -ExecutionPolicy Bypass -Command "{remove_command}"')
+                        exit_status = stdout.channel.recv_exit_status()
+                        if exit_status == 0:
+                            print(f"Successfully removed '{copy_to_remove_path}'.")
+                            archive_queue = archive_queue.pop(1)
+                            sch_obj.archive_queue = archive_queue
+                            db.session.commit()
+                        else:
+                            error = stderr.read().decode()
+                            print(f"Error removing '{copy_to_remove_path}': {error}")
+                    else:
+                        error = stderr.read().decode()
+                        print(f"Error merging contents: {error}")
                 else:
                     archive_queue.append(destination_folder_name)
                     sch_obj.archive_queue = str(archive_queue)
@@ -706,6 +710,7 @@ class Zeroapi:
             output = ""
             error_output = ""
             
+            print("COMMANDS IN RUN BACKUP ARE", commands)
             for cmd in commands:
                 stdin.write(cmd + "\n")
                 stdin.flush()
@@ -723,10 +728,6 @@ class Zeroapi:
             exit_code = stdout.channel.recv_exit_status()
             
             storage_client.close()
-
-            print("SFTP Output:", output)
-            print("SFTP Error Output:", error_output)
-            print("SFTP Exit Code:", exit_code)
 
             if exit_code == 0:
                 if sch_obj:
@@ -789,10 +790,7 @@ class Zeroapi:
             
     @staticmethod
     def handle_sftp_result(output, error_output, backup_exit_code):
-       print("OUTPUT IN HANDLE IS", output)
-       print("ERROR IN HANDLE IS", error_output)
        if backup_exit_code == 0 and not error_output:
-           print("BACKUP WAS SUCCESSSSSSSS!")
            return backup_exit_code
        else:
            print(f"Remote SFTP failed. Exit code: {backup_exit_code}, Error: {error_output}")
@@ -801,7 +799,11 @@ class Zeroapi:
     @staticmethod
     def run_backup_thread(storage_client, endpoint_username, endpoint_ip,selected_storage_volumes, job_id, sch_id, backup_paths):
         with app.app_context():
+            print("BACKUP PATHS ARE", backup_paths)
             sch_obj= ScheduledJob.query.filter_by(id=sch_id).first()
+            archive_queue_string = sch_obj.archive_queue
+            archive_queue = ast.literal_eval(archive_queue_string)
+
             fetched_job = BackupJob.query.filter_by(id=job_id).first()
             fetched_job_name = fetched_job.name.replace(" ","")
             fetched_job_esnpair = fetched_job.esnpair
@@ -809,20 +811,33 @@ class Zeroapi:
             if isexist:
                 if "Volumes" in selected_storage_volumes:
                     backup_time = datetime.now()
-                    #current_datetime= datetime.now().strftime("%H:%M:%S")
                     selected_storage_volumes_list = selected_storage_volumes['Volumes'].keys()
+                    remote_folder_name = backup_paths[0]
+                    destination_folder_path= ""
+                    destination_folder_name=""
+                    destination_folder_root= ""     
+                    
                     for vol in selected_storage_volumes_list:
-                        destination_folder_name = f'{fetched_job_name}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
-                        destination_folder_path = fr'{vol}/{destination_folder_name}/'
-                        destination_folder_root =  fr'{vol}/'
-                        command =  f'mkdir {destination_folder_path}'
-                        stdin, stdout, stderr = storage_client.exec_command(command)
+                        print("Selected Storage Volume is", vol)
+                        if len(archive_queue)== 0: #creates full backup folder if archive queue is empty
+                            destination_folder_name=f'{fetched_job_name}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
+                            destination_folder_path = fr'{vol}/{destination_folder_name}/{remote_folder_name}'
+                            create_full_copy_folder = fr'mkdir "{destination_folder_path}"'
+                           
+                            stdin, stdout, stderr = storage_client.exec_command(create_full_copy_folder)
+                           
+                        else: #creates increment folders
+                            destination_folder_name = f'{fetched_job_name}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
+                            destination_folder_path = fr'{vol}/{destination_folder_name}/'
+                            destination_folder_root =  fr'{vol}/'
+                            command =  fr'mkdir "{destination_folder_path}"'
+                            stdin, stdout, stderr = storage_client.exec_command(command)
                         sftp_commands =[]
                         
-                        for path in backup_paths:
+    
+                        for path in backup_paths[1:]:
                             if path not in sftp_commands:
-                                #sftp_commands.append( 'get -r ' + path.replace("\\", "/") +' '+backup_destination.replace("\\", "/"))
-                                sftp_commands.append( fr'get -r "{path}" "{destination_folder_path}"')
+                                sftp_commands.append( fr'reget -r "{path}" "{destination_folder_path}"')
                         sftp_commands.append('bye')
 
                         if sch_obj:
@@ -850,10 +865,7 @@ class Zeroapi:
                             else:
                                 Zeroapi.backup_with_errors[job_id] = [vol]
                     storage_client.close() 
-    
-    @staticmethod
-    def UnPairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
-        pass #for later
+
 
     @staticmethod
     def run_scheduled_backup(job_id, sch_id, selected_storage_volumes):
@@ -867,8 +879,8 @@ class Zeroapi:
             endpoint_username =   fetched_schedule.existing_job.esn_pair.endpoint.username
             endpoint_ip =   fetched_schedule.existing_job.esn_pair.endpoint.ip
             endpoint_ip = zcryptobj._decrypt_data(encrypted_data=endpoint_ip, type="ENDPOINT")
-            remote_folder = f"C:\\Users\\{endpoint_username}\\Desktop"
-
+            remote_folder = f"C:/Users/{endpoint_username}/Desktop"  #hardcoding volume path for demo 
+            remote_folder_name = remote_folder.split('/')[-1]
             pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
 
             storage_client = paramiko.SSHClient()
@@ -881,10 +893,8 @@ class Zeroapi:
             endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
             endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
             
-
-            #command =  f"$fileInfo = @{{}}; Get-ChildItem -Path \"{remote_folder}\" -Recurse | Where-Object {{ ! $_.PSIsContainer }} | ForEach-Object {{ $hash = Get-FileHash -Path $_.FullName -Algorithm SHA1 | Select-Object -ExpandProperty Hash; $fileInfo[$_.FullName] = @{{'LastModified'=$_.LastWriteTime.ToString('M/d/yyyy HH:mm:ss'); 'SHA1Hash'=$hash}} }}; $fileInfo | ConvertTo-Json"
             command= f"$fileInfo = @{{}}; Get-ChildItem -Path \"{remote_folder}\" -Recurse | ForEach-Object {{ $itemPath = $_.FullName; $itemInfo = @{{'LastModified'=$_.LastWriteTime.ToString('M/d/yyyy HH:mm:ss')}}; if ($_.PSIsContainer) {{ $itemInfo['Type'] = 'Folder' }} else {{ $itemInfo['Type'] = 'File'; $hash = Get-FileHash -Path $_.FullName -Algorithm SHA1 | Select-Object -ExpandProperty Hash; $itemInfo['SHA1Hash'] = $hash }}; $fileInfo[$itemPath] = $itemInfo }}; $fileInfo | ConvertTo-Json"
-            _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=999)
+            _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=60)
             output = stdout.read().decode('utf-8').strip()
             error = stderr.read().decode('utf-8').strip()
             
@@ -913,7 +923,7 @@ class Zeroapi:
                                 if metainfo['LastModified'] != stored_increment_content[path].get('LastModified'):
                                     modded_files.append(path.replace("\\\\", "/"))
                                     next_increment_config[path] = metainfo
-                    
+                    modded_files.insert(0, 'incremental paths')
                     with open(config_file_path, 'w') as wf:
                         json.dumps(next_increment_config, wf, indent=4)
         
@@ -930,7 +940,7 @@ class Zeroapi:
                     if parent_dir in file_info:
                         continue
                     modded_files.append(path.replace("\\\\", "/"))
-
+                modded_files.insert(0, remote_folder_name)
             threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, selected_storage_volumes, job_id, sch_id, modded_files)).start()
             
             job = scheduler.get_job(f"{job_id}:{sch_id}")
@@ -947,6 +957,54 @@ class Zeroapi:
                 db.session.delete(fetched_schedule.existing_job)
                 db.session.commit() 
         
+    
+    @app.route('/zeroapi/v1/backup/get_restore_points/<job_id>', methods=['GET'])
+    def get_restore_points(job_id):
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                fetched_schedule = ScheduledJob.query.filter_by(job_id=job_id).first()
+                if fetched_schedule:
+                    archive_queue_str = fetched_schedule.archive_queue
+                    archive_queue = ast.literal_eval(archive_queue_str)
+                    restore_point_names=[]
+                    for arc in archive_queue:
+                        datetime_part = " ".join(arc.split("_")[1:])
+                        datetime_object = datetime.strptime(datetime_part, '%Y-%m-%d %H-%M-%S')
+                        restore_point_label = datetime_object.strftime('%Y-%m-%d %I:%M:%S%p')
+                        restore_point_names.append(restore_point_label)
+                    return jsonify({"response":  restore_point_names}),200
+                else:
+                    return jsonify({"response":  []}),200
+        except Exception as e:
+            print(e)
+            return jsonify({"response":  -1}),500
+    
+    
+    
+    @app.route('/zeroapi/v1/backup/restore', methods=['POST'])
+    def restore():
+        user_token= request.headers['Authorization'].split(' ')[1]
+        if not user_token:
+            return jsonify({"message": "Access token is missing or invalid"}),401
+        try:
+            decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            namepart= decoded['sub'].lower()
+            fetched_user = User.query.filter_by(username=namepart).first()
+            if namepart == fetched_user.username.lower():
+                data = request.get_json()
+                restore_point = data.get("restore_point")
+                job_id = data.get("job_id")
+        except Exception as e:
+            print(e)
+            return jsonify({"response":  -1}),500
+        
+    
     @staticmethod
     def remove_sch_job(sch_job_id):
         scheduler.remove_job(sch_job_id)

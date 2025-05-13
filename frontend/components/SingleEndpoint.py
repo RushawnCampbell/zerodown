@@ -1,8 +1,9 @@
-import customtkinter
+import customtkinter, requests, json
 from frontend.components.Popup import Popup
 from frontend.components.RestoreJob import RestoreJob
 from frontend.Utility.CommonMethods import CommonMethods
 from tkinter import messagebox
+import tkinter as tk
 
 class SingleEndpoint(Popup):
 
@@ -11,6 +12,7 @@ class SingleEndpoint(Popup):
 
         self.configure(fg_color="#2B2B2B")
         self.endpoint_id = endpoint_id
+        self.restore_points = []
 
         self.after(300, self.set_window_position_top_centered, 800, 700)
 
@@ -71,28 +73,38 @@ class SingleEndpoint(Popup):
         )
         if removal_confirmation:
             print(f"Remove button clicked for job ID: {job_id}")
-            # Add your logic to handle the removal of the job here
             pass
 
-    def restore_job(self, job_id):
-        restore_window = RestoreJob(self, "Restore Job", job_id)
+    def get_restore_points(self, job_id):
+        resource_url= f"http://127.0.0.1:8080//zeroapi/v1/backup/get_restore_points/{job_id}"
+        zauth_token = self.master.master.retrieve_auth_token()
+        zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
+        del zauth_token
+        try:
+            response = requests.get( resource_url, stream=True, headers=zeroheaders)
+            response.raise_for_status()
+            self.restore_points= response.json()["response"]
+        except requests.exceptions.RequestException as e:
+            tk.messagebox.showerror("Fetch Error", f"Failed to get restore points {e}")
+            
+        except Exception as e:
+            print("ERROR IS",e)
+            tk.messagebox.showerror("Fetch Error", f"An Application Error Occurred, report this to ZeroDown.")
+        restore_window = RestoreJob(self, "Restore Job", job_id, self.restore_points)
 
     def _populate_scheduled_jobs(self):
-        # Clear existing widgets in the frame
         for widget in self.scheduled_jobs_frame.winfo_children():
             widget.destroy()
 
-        # Create heading labels
         heading_labels = ["Job Name", "Target", "Backup Location", "Actions"]
         for i, heading in enumerate(heading_labels):
             label = customtkinter.CTkLabel(self.scheduled_jobs_frame, text=heading, text_color="white", font=customtkinter.CTkFont(weight="bold"))
-            sticky_value = "w" if i == 0 else "ew"  # Left align "Job Name", others stretch
+            sticky_value = "w" if i == 0 else "ew"  
             padx_left = 20 if i == 0 else 5
             padx_right = 5 if i < len(heading_labels) - 1 else 20
             label.grid(row=0, column=i, padx=(padx_left, padx_right), pady=(5, 5), sticky=sticky_value)
-            self.scheduled_jobs_frame.grid_columnconfigure(i, weight=1 if i < len(heading_labels) - 1 else 0) # Adjust weight for even distribution
+            self.scheduled_jobs_frame.grid_columnconfigure(i, weight=1 if i < len(heading_labels) - 1 else 0) 
 
-        # Populate job data
         for i, job_data in enumerate(self.scheduled_jobs_data):
             job_name = job_data.get("job_name", "N/A")
             job_id = job_data.get("job_id")
@@ -116,7 +128,7 @@ class SingleEndpoint(Popup):
             except (SyntaxError, TypeError):
                 pass
 
-            row_num = i + 1  # Start placing data below the headings
+            row_num = i + 1 
 
             job_label = customtkinter.CTkLabel(self.scheduled_jobs_frame, text=job_name, text_color="white")
             job_label.grid(row=row_num, column=0, padx=(20, 5), pady=5, sticky="w")
@@ -130,22 +142,21 @@ class SingleEndpoint(Popup):
             remove_button = customtkinter.CTkButton(self.scheduled_jobs_frame, text="Remove", width=80, command=lambda id=job_id: self._on_remove_job(id))
             remove_button.grid(row=row_num, column=3, padx=(5, 5), pady=5, sticky="e")
 
-            restore_button = customtkinter.CTkButton(self.scheduled_jobs_frame, text="Restore", width=80, command=lambda id=job_id: self.restore_job(id))
+            restore_button = customtkinter.CTkButton(self.scheduled_jobs_frame, text="Restore", width=80, command=lambda id=job_id: self.get_restore_points(id))
             restore_button.grid(row=row_num, column=4, padx=(5, 20), pady=5, sticky="e")
 
-        self.scheduled_jobs_frame.grid_columnconfigure(0, weight=1) # Job Name
-        self.scheduled_jobs_frame.grid_columnconfigure(1, weight=1) # Target
-        self.scheduled_jobs_frame.grid_columnconfigure(2, weight=1) # Destination
-        self.scheduled_jobs_frame.grid_columnconfigure(3, weight=0) # Remove Button
-        self.scheduled_jobs_frame.grid_columnconfigure(4, weight=0) # Restore Button
+        self.scheduled_jobs_frame.grid_columnconfigure(0, weight=1)
+        self.scheduled_jobs_frame.grid_columnconfigure(1, weight=1) 
+        self.scheduled_jobs_frame.grid_columnconfigure(2, weight=1) 
+        self.scheduled_jobs_frame.grid_columnconfigure(3, weight=0) 
+        self.scheduled_jobs_frame.grid_columnconfigure(4, weight=0) 
 
 
     def _on_unpair_node(self, node_id):
         print(f"Unpair button clicked for storage node ID: {node_id}")
-        # Add your logic to handle the unpairing of the node here
+        
 
     def _populate_paired_nodes(self):
-        # Clear existing widgets in the frame
         for widget in self.paired_nodes_frame.winfo_children():
             widget.destroy()
         for i, node_data in enumerate(self.paired_storage_nodes_data):

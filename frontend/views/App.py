@@ -179,7 +179,7 @@ class App(gui.CTk):
                         self.endpointregistration  = Endpointregistration(self, 'Endpoint')
 
                     elif viewclassname == "storageregistration":
-                        self.storageregistration  = Storageregistration(self, 'Endpoint')
+                        self.storageregistration  = Storageregistration(self, 'Storage')
 
                     else:
                         tkinterstring = f"{viewclassname.title()}(self)"

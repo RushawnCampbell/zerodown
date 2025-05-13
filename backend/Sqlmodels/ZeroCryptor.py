@@ -48,7 +48,7 @@ class ZeroCryptor:
             return key.decrypt(encrypted_data).decode()
         except InvalidToken:
             print(f"Decryption failed: Invalid token")
-            return None  # Or raise an exception
+            return None  
         except InvalidSignature:
             print(f"Decryption failed: Invalid signature")
             return None
