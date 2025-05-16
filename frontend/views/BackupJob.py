@@ -6,6 +6,10 @@ from frontend.components.ScheduleJob import ScheduleJob
 from frontend.Utility.CommonMethods import CommonMethods
 
 class Backupjob(gui.CTkFrame):
+    """
+    A custom frame for creating and managing backup jobs.
+    Allows users to define the source, destination, and schedule for backups.
+    """
     def __init__(self, master):
         super().__init__(master)
         self.master = master
@@ -30,6 +34,10 @@ class Backupjob(gui.CTkFrame):
         self.applications = ['APP ONE', 'APP TWO', 'APP THREE', 'APP FOUR']
 
     def create_widgets(self):
+        """
+        Creates and arranges the UI elements for defining a backup job.
+        Includes labels, entry fields, dropdowns, and buttons.
+        """
         # Title Frame
         self.title_frame = gui.CTkFrame(self)
         self.title_frame.grid(row=0, column=0, columnspan=3, sticky="ew")
@@ -54,10 +62,10 @@ class Backupjob(gui.CTkFrame):
 
         endpoints = self.fetch_objects("endpoint_names")
         endpoints.insert(0, "-Select an Option-")
-    
+
         self.endpoint_dropdown = gui.CTkComboBox(self.form_frame, values=endpoints, dropdown_fg_color="#FFFFFF", dropdown_text_color="#000000", fg_color="#FFFFFF", border_color="#FFFFFF", text_color="#000000", command=lambda selected_endpoint: self.activate_browse_button(selected_endpoint))
         self.endpoint_dropdown.grid(row=1, column=1, padx=(5, 20), pady=(5, 5), sticky="ew")
-        
+
         self.browse_items_button = gui.CTkButton(self.form_frame, state=tk.DISABLED, text="Select an Endpoint To Browse", fg_color="#2b2b2b", command=self.browse_object)
         self.browse_items_button.grid(row=2, column=0, columnspan=2, pady=(10, 5), padx=20, sticky="ew")
 
@@ -74,7 +82,7 @@ class Backupjob(gui.CTkFrame):
 
         self.browse_destination_button = gui.CTkButton(self.form_frame, text="Select Backup Destination", state=tk.DISABLED, fg_color="#2b2b2b", command= self.select_storage_destination)
         self.browse_destination_button.grid(row=4, column=1, padx=(5, 20), pady=(5, 5), sticky="ew")
-        
+
 
         # Row 5: Make Copies On Another Storage Node Switch + Add another storage button.
         self.copy_switch_var = tk.BooleanVar()
@@ -91,7 +99,7 @@ class Backupjob(gui.CTkFrame):
         self.additional_storage_frame.grid(row=6, column=0, columnspan=2, pady=(0,0), padx=20, sticky="ew")
         self.additional_storage_frame.grid_columnconfigure(0, weight=1)
         self.additional_storage_frame.grid_columnconfigure(1, weight=1)
-        
+
 
         # Row within Scrollable Frame: Storage Node Dropdown and Choose Location Button
         self.additional_storage_node_dropdown = gui.CTkComboBox(self.additional_storage_frame, values=storagenodes, fg_color="#000000", border_color="#000000", text_color="#000000", state=tk.DISABLED)
@@ -117,11 +125,14 @@ class Backupjob(gui.CTkFrame):
         self.rowconfigure(1, weight=1)
 
     def fetch_objects(self, obj_type):
+        """
+        Retrieves a list of objects (endpoints or storage nodes) from the backend.
+        """
         try:
             objects = CommonMethods.get_objects(obj_type, self.master.app_name, self.master.windows_user)
             if objects == None:
-               tk.messagebox.showerror("Failed to Get Items", f"Failed to get requested items")
-               return objects
+                tk.messagebox.showerror("Failed to Get Items", f"Failed to get requested items")
+                return objects
             else:
                 return objects
         except Exception as e:
@@ -130,6 +141,9 @@ class Backupjob(gui.CTkFrame):
 
 
     def get_endpoint_volumes(self, endpoint_name):
+        """
+        Retrieves the volumes associated with a selected endpoint.
+        """
         resource_url= f"http://127.0.0.1:8080/zeroapi/v1/endpoint/listing/{endpoint_name.lower()}"
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
@@ -154,6 +168,9 @@ class Backupjob(gui.CTkFrame):
             #return -1
 
     def get_storage_volumes(self, storage_name):
+        """
+        Retrieves the volumes available on a selected storage node.
+        """
         resource_url= f"http://127.0.0.1:8080/zeroapi/v1/storage/volumes/{storage_name.lower()}"
         zauth_token = self.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {zauth_token}", "Content-Type": "application/json"}
@@ -178,12 +195,18 @@ class Backupjob(gui.CTkFrame):
             #return -1
 
     def activate_browse_button(self, selected_endpoint):
+        """
+        Enables or disables the browse button based on whether an endpoint is selected.
+        """
         if selected_endpoint !="" and selected_endpoint != "-Select an Option-":
             self.browse_items_button.configure(state=tk.NORMAL, fg_color="#1F6AA5", text=f"Browse {selected_endpoint} Backup Items")
         else:
             self.browse_items_button.configure(state=tk.DISABLED, fg_color="#2b2b2b", text="Select an Endpoint To Browse")
-    
+
     def activate_select_destination(self, selected_storage):
+        """
+        Enables the select destination button if a storage node is selected and valid.
+        """
         storage_node_val =  self.master_validator(widget_label="storage_node_val")
         if storage_node_val < 1:
             return -1
@@ -193,6 +216,9 @@ class Backupjob(gui.CTkFrame):
 
 
     def browse_object(self):
+        """
+        Opens the RemoteExplorer window to browse the contents of the selected endpoint.
+        """
         self.backup_demand = 0.00
         self.endpoint_name=self.endpoint_dropdown.get()
         title = f'{self.browse_items_button.cget("text")}'
@@ -200,10 +226,13 @@ class Backupjob(gui.CTkFrame):
         RemoteExplorer(self, title, self.endpoint_name, "endpoint", "backup")
 
     def select_storage_destination(self):
+        """
+        Opens the RemoteExplorer window to select a backup destination on the chosen storage node.
+        """
         title = f' Storage Nodes on {self.selected_storage}'
         RemoteExplorer(self, title, self.selected_storage, "storage", "backup")
 
-
+    #iniaite first time backup
     def backup_now(self):
         job_name_vf = self.master_validator(widget_label="job_name") #job name validation factor
         storage_node_vf = self.master_validator(widget_label="storage_node_val") #storage node validation factor
@@ -238,7 +267,7 @@ class Backupjob(gui.CTkFrame):
             except requests.exceptions.RequestException as e:
                 tk.messagebox.showerror("Backup Error", f"An unexpected error occurred. Please try again or contact ZeroDown Support for help.")
 
-
+    #validates the required fields
     def master_validator(self, widget_label, event=None):
         if widget_label == "job_name":
             if  self.backup_job_name.get() == None or self.backup_job_name.get() == ""  or self.backup_job_name.get() == "Name this Backup Job":

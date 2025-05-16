@@ -5,6 +5,10 @@ from frontend.components.Popup import Popup
 from PIL import Image
 
 class TestConnection(Popup):
+    """
+    A popup window to test the connection to a remote object.
+    Displays a loading animation and the connection status.
+    """
     def __init__(self, master, title, ip, authorized_user):
         super().__init__(master, title)
         self.master = master
@@ -15,25 +19,33 @@ class TestConnection(Popup):
         self.test_object_connection()
 
     def configure_body(self):
+        """
+        Configures the appearance of the popup window.
+        Sets the background color and disables window closing via the 'X' button.
+        """
         self.configure(fg_color="#FFFFFF")
         self.protocol("WM_DELETE_WINDOW", self.disable_close)
 
-        self.rowconfigure(0, weight=1) 
+        self.rowconfigure(0, weight=1)
 
-        main_frame = gui.CTkFrame(self, fg_color="transparent") 
-        main_frame.pack(expand=True) 
+        main_frame = gui.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(expand=True)
 
         gif_label = gui.CTkLabel(main_frame, text="")
-        gif_label.pack(pady=(0, 5)) 
+        gif_label.pack(pady=(0, 5))
 
         self.status_label = gui.CTkLabel(main_frame, text= f"Attempting Secure {self.master.reg_type} Connection...")
-        self.status_label.pack(pady=(5, 0)) 
+        self.status_label.pack(pady=(5, 0))
         self.status_label.configure(text_color="black")
 
         gif_path = os.path.join("frontend", "assets", "images", "testing.gif")
         self.display_gif(gif_label, gif_path, 100, 100)
 
     def test_object_connection(self):
+        """
+        Sends an API request to test the connection to the remote object.
+        Updates the UI based on the connection status (success or failure).
+        """
         resource_url = "http://127.0.0.1:8080/zeroapi/v1/test_connection"
         auth_token = self.master.master.retrieve_auth_token()
         zeroheaders = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
@@ -52,7 +64,6 @@ class TestConnection(Popup):
                 self.master.ctk_completed_image=gui.CTkImage(light_image=self.master.completed_image, dark_image=self.master.completed_image, size=(25, 25))
                 self.master.step3_button.configure(image=self.master.ctk_completed_image, fg_color="#1fa59d", text="Connection Successful")
                 self.status_label.configure(text_color="#1fa59d", text="Connection Successful")
-                #self.master.step4_button.custom_data["test_result"] = 1
                 self.master.step4_button.configure(state="normal", fg_color="#1F6AA5")
                 self.after(2000, self.on_close)
             else:
@@ -61,7 +72,6 @@ class TestConnection(Popup):
                 self.master.warning_image = Image.open("./frontend/assets/icons/danger.png")
                 self.master.ctk_warning_image = gui.CTkImage(light_image=self.master.warning_image, dark_image=self.master.warning_image, size=(25, 25))
                 self.master.step3_button.configure(fg_color="#cc3300", text="Connection Failed: Retry Test", image=self.master.ctk_warning_image )
-                #self.master.step4_button.custom_data["test_result"] = 0
                 self.master.step4_button.configure(state="disabled", fg_color="#2b2b2b")
                 self.after(5000, self.on_close)
 
@@ -71,7 +81,6 @@ class TestConnection(Popup):
             self.master.warning_image = Image.open("./frontend/assets/icons/danger.png")
             self.master.ctk_warning_image = gui.CTkImage(light_image=self.master.warning_image, dark_image=self.master.warning_image, size=(25, 25))
             self.master.step3_button.configure(fg_color="#cc3300", text="Connection Failed: Retry Test", image=self.master.ctk_warning_image )
-            #self.master.step4_button.custom_data["test_result"] = 0
             self.master.step4_button.configure(state="disabled", fg_color="#2b2b2b")
             self.after(5000, self.on_close)
         except Exception as e:

@@ -83,7 +83,7 @@ class SingleEndpoint(Popup):
         try:
             response = requests.get( resource_url, stream=True, headers=zeroheaders)
             response.raise_for_status()
-            self.restore_points= response.json()["response"]
+            self.restore_points= response.json()
         except requests.exceptions.RequestException as e:
             tk.messagebox.showerror("Fetch Error", f"Failed to get restore points {e}")
             

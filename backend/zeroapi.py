@@ -16,6 +16,7 @@ class Zeroapi:
     backup_with_errors = {}
     backup_with_success = {}
 
+    #creates user administratively
     @app.route('/zeroapi/v1/adduser', methods=['GET'])
     def adduser():
         newuser  = User(first_name="Rushawn",last_name="Campbell",email="rushawn.campbell@mymona.uwi.edu", username="admin", password="admin123")
@@ -23,7 +24,8 @@ class Zeroapi:
         db.session.commit()
         print("status ok user added")
         return jsonify({"stat": "ok user added"})
-    #LLog in User
+    
+    #Log in User
     @app.route('/zeroapi/v1/login', methods=['POST'])
     def login():
         user = None
@@ -62,7 +64,7 @@ class Zeroapi:
             decoded = jwt.decode(user_token, app.config['SECRET_KEY'], algorithms=['HS256'])
             namepart= decoded['sub'].lower()
             fetched_user = User.query.filter_by(username=namepart).first()
-            if namepart == fetched_user.username.lower():
+            if namepart == fetched_user.username.lower(): #only allows download from token authenticated users
                 try:
                     filename = f'{download_type}.zip'
                     file_path = os.path.join(app.root_path,"..\\","dist", filename) 
@@ -83,7 +85,8 @@ class Zeroapi:
 
         except Exception as e:
             return jsonify({"message": "Access token is missing or invalid"}),401
-        
+
+    #Tests ssh connections between Zerodown server, endpoints and storage nodes.  
     @app.route('/zeroapi/v1/test_connection', methods=['POST'])
     def test_connection():
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -99,17 +102,17 @@ class Zeroapi:
                     hostname= data.get('hostname')
                     username=data.get('authorized_user')
                     reg_type=data.get('reg_type')
-                    pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+                    pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH')) #get Zerodown server's private key 
                     
                     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
-                    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    client.set_missing_host_key_policy(paramiko.AutoAddPolicy()) #Auto add ip to known host keys for first time connections only
             
                     client.connect(hostname=hostname, username=username,  pkey=pkey)
                     if reg_type == "storagenode":
-                        command = "type %USERPROFILE%\\.ssh\\id_rsa.pub"
-                        stdin, stdout, stderr = client.exec_command("cmd.exe /c \"" + command + "\"")
+                        command = "type %USERPROFILE%\\.ssh\\id_rsa.pub" 
+                        stdin, stdout, stderr = client.exec_command("cmd.exe /c \"" + command + "\"") #using cmd to get storage node public key
                         fetched_pub = stdout.read().decode().strip()
                         error = stderr.read().decode().strip()
                         if not error:
@@ -130,7 +133,7 @@ class Zeroapi:
             return jsonify({"response": "Access token is missing or invalid"}),401
         
 
-
+    #registers storage node and endpoints
     @app.route('/zeroapi/v1/register/<register_type>', methods=['POST'])
     def register_endpoint(register_type):
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -146,12 +149,14 @@ class Zeroapi:
                 object_ip= data.get('ip')
                 object_user=data.get('authorized_user')
                 if register_type == "endpoint":
+                    #creates storage node record  ip address is  encrypted in the Endpoint model before upgrading migration to mysql
                     endpoint_object = Endpoint(ip=object_ip, name=object_name, username=object_user)
                     db.session.add(endpoint_object)
                     db.session.commit()
                     return jsonify({"message": "Endpoint Node Registered"}),200
-                if register_type == "storagenode":
+                if register_type == "storagenode": 
                     pub_key=data.get('pub_key')
+                    #creates storage node record  ip and public key are encrypted in the StorageNode model before upgrading migration to mysql
                     storage_object = StorageNode(ip=object_ip, name=object_name, username=object_user,pub_key=pub_key)
                     db.session.add(storage_object)
                     db.session.commit()
@@ -164,7 +169,8 @@ class Zeroapi:
             print(f"An exception occurred: {e}")
             print(f"Line number: {line_number}")
             return jsonify({"message": "Access token is missing or invalid"}),401
-        
+    
+    #Getting storage node, endpoint objects, scheduledjobs,
     @app.route('/zeroapi/v1/objects/<object_type>', methods=['GET'])
     def objects(object_type):
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -250,9 +256,7 @@ class Zeroapi:
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     line_number = exc_traceback.tb_lineno
-                    print("EXCEPTION TYPE", exc_type)
-                    print("EXCEPTION MESSAGE", exc_value)
-                    print("EXCEPTION LINE", line_number)
+                
                     return jsonify({
                             "message": "Something went wrong. Contact the ZeroDown Support for help.",
                         }),500
@@ -325,9 +329,6 @@ class Zeroapi:
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     line_number = exc_traceback.tb_lineno
-                    print("EXCEPTION TYPE", exc_type)
-                    print("EXCEPTION MESSAGE", exc_value)
-                    print("EXCEPTION LINE", line_number)
                     return jsonify({
                             "message": "Something went wrong. Contact the ZeroDown Support for help.",
                         }),500
@@ -424,7 +425,7 @@ class Zeroapi:
                     "response": "Something went wrong. Contact the ZeroDown Support for help.",
             }),500
 
-
+    #Getting Endpoints available and consumed size
     @app.route('/zeroapi/v1/endpoint/backupdemand/<endpoint_name>', methods=['POST'])
     def backupdemand(endpoint_name):
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -464,7 +465,7 @@ class Zeroapi:
                     "response": "Something went wrong. Contact the ZeroDown Support for help.",
             }),500
 
-
+    #One time backup endpoint
     @app.route('/zeroapi/v1/backup/first_time', methods=['POST'])
     def first_time():
         user_token = request.headers.get('Authorization', '').split(' ')[-1]
@@ -482,19 +483,21 @@ class Zeroapi:
             fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
             fetched_storage = cache.get(f'{namepart}_current_storage_node')
     
-            zcryptobj = ZeroCryptor()
+            zcryptobj = ZeroCryptor() #custom cryptography object
             storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
-            storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
+            storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE") #decrypted storage node ip
             storage_node_username = fetched_storage.username
             storage_node_id = fetched_storage.id
-            endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")
+            endpoint_ip = zcryptobj._decrypt_data(encrypted_data=fetched_endpoint.ip, type="ENDPOINT")  #decrypted endpoint  ip
             endpoint_username = fetched_endpoint.username
             endpoint_id = fetched_endpoint.id
+            #pairing endpoint and storage
             storage_client, pairing_sftp_exit_code, isexists_code,  isexists_esn_pair_id = Zeroapi.PairESN(storage_node_id, storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username)
     
+            #checking for existing pairing returned by Pairesn 
             if pairing_sftp_exit_code != 0:
                 return jsonify({"response": pairing_sftp_exit_code}), 500
-    
+            #indicates success
             if isexists_code == 0:
                 esnpair_id = str(uuid.uuid4())
                 espnobj = ESNPair( storage_node_id= storage_node_id, endpoint_id= endpoint_id, id=esnpair_id)
@@ -504,12 +507,12 @@ class Zeroapi:
                 esnpair_id = isexists_esn_pair_id
     
             selected_storage_volumes = data.get('backup_destinations')
-            remote_folder_path= f"C:/Users/{endpoint_username}/Desktop"
+            remote_folder_path= f"C:/Users/{endpoint_username}/Desktop" #modified for demo
             remote_folder_name = remote_folder_path.split("/")[-1]
             remote_folder = [ remote_folder_name, remote_folder_path ]
             job_id = str(uuid.uuid4())
     
-   
+            #run backup operation in a new thread
             threading.Thread(target=Zeroapi.run_backup_thread, args=(storage_client, endpoint_username, endpoint_ip, selected_storage_volumes, job_id, None, remote_folder)).start()
             job_name = data.get('name')
             backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
@@ -522,6 +525,7 @@ class Zeroapi:
             return jsonify({"in_progress": -1}),500
         
     
+    #schedules backup job
     @app.route('/zeroapi/v1/backup/schedule', methods=['POST'])
     def schedule():
         user_token = request.headers.get('Authorization', '').split(' ')[-1]
@@ -538,6 +542,7 @@ class Zeroapi:
             fetched_endpoint = cache.get(f'{namepart}_current_endpoint')
             fetched_storage = cache.get(f'{namepart}_current_storage_node')
 
+            #pairs storage with endpoint if not already done
             zcryptobj = ZeroCryptor()
             storage_node_pub_key = zcryptobj._decrypt_data(encrypted_data=fetched_storage.pub_key, type="STORAGE")
             storage_node_ip = zcryptobj._decrypt_data(encrypted_data=fetched_storage.ip, type="STORAGE")
@@ -549,6 +554,7 @@ class Zeroapi:
             storage_client, pairing_sftp_exit_code, isexists_code,  isexists_esn_pair_id = Zeroapi.PairESN(storage_node_id, storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username)
             storage_client.close()
 
+            #testing sftp connection between storage and endpoint
             if pairing_sftp_exit_code != 0:
                 return jsonify({"response": "Preflight Test Failed, We Couldn't Connect Your Endpoint To The Storage Node. Verify that SSH Server Service is running on both."}), 500
     
@@ -564,6 +570,7 @@ class Zeroapi:
             job_id = str(uuid.uuid4())
             job_name = data.get('name')
 
+            #create backupjob to aid with endpoint and storage node management later
             backupjob = BackupJob( esnpair=esnpair_id, name=job_name, target=str(data.get('backup_targets')), destination=str(data.get('backup_destinations')), id=job_id)
             db.session.add(backupjob)
             db.session.flush()
@@ -585,7 +592,7 @@ class Zeroapi:
             db.session.commit()
 
             selected_storage_volumes = data.get('backup_destinations')
-
+            #setting up apscheduler for onetime scheduled job
             if sch_frequency == "One Time":
                 scheduler.add_job(
                     func=Zeroapi.run_scheduled_backup,
@@ -595,6 +602,7 @@ class Zeroapi:
                     id=f"{job_id}:{sch_id}",  
                     replace_existing=True
                 )
+            #setting up apscheduler for Daily scheduled Cron job
             elif sch_frequency == "Daily":
                 scheduler.add_job(
                     func=Zeroapi.run_scheduled_backup,
@@ -605,6 +613,8 @@ class Zeroapi:
                     id=f"{job_id}:{sch_id}",
                     replace_existing=True
                    )
+                
+            #setting up apscheduler for weekly scheduled Cron job
             elif sch_frequency == "Weekly":
                 scheduler.add_job(
                     func=Zeroapi.run_scheduled_backup,
@@ -617,6 +627,7 @@ class Zeroapi:
                     replace_existing=True
                 )
 
+            #setting up apscheduler for Monthly scheduled Cron job
             elif sch_frequency == "Monthly":
                 scheduler.add_job(
                     func=Zeroapi.run_scheduled_backup,
@@ -635,7 +646,7 @@ class Zeroapi:
             print("ERROR IS", e)
             return jsonify({"in_progress": -1}),500
         
-        
+    #called at intervals from frontend to measure when backup jobs are complete 
     @app.route('/zeroapi/v1/backup/get_status', methods=['POST'])
     def get_status():
         user_token = request.headers.get('Authorization', '').split(' ')[-1]
@@ -662,6 +673,7 @@ class Zeroapi:
             return jsonify({"response": -1}),500
 
     #UTILITY FUNCTIONS
+    #performs the main backup operations(called from in thread)
     @staticmethod
     def run_backup(storage_client, endpoint_username, endpoint_ip, commands, sch_obj=None, destination_folder_name=None,  destination_folder_root=None):
         try:
@@ -676,7 +688,7 @@ class Zeroapi:
                     full_copy_name=  archive_queue[0]
                     copy_to_remove_name = archive_queue[1]
 
-                    full_copy_path = fr'{destination_folder_root}/{full_copy_name}'
+                    full_copy_path = fr'{destination_folder_root}/{full_copy_name}' #constructing storage node path
                     copy_to_remove_path = fr'{destination_folder_root}/{copy_to_remove_name}'
 
                     merge_command = fr"Get-ChildItem -Path '{copy_to_remove_path}' -Recurse | Copy-Item -Destination '{full_copy_path}' -Force"
@@ -704,7 +716,7 @@ class Zeroapi:
                     sch_obj.archive_queue = str(archive_queue)
                     db.session.commit()
 
-            command = f'sftp -oBatchMode=yes {endpoint_username}@{endpoint_ip}'
+            command = f'sftp -oBatchMode=yes -C {endpoint_username}@{endpoint_ip}'
             stdin, stdout, stderr = storage_client.exec_command(command)
 
             output = ""
@@ -744,6 +756,7 @@ class Zeroapi:
             return None, None, -1
     
     @staticmethod
+    #pairs storage nodes with endpoints
     def PairESN(storage_node_id,storage_node_pub_key, storage_node_ip, storage_node_username, endpoint_id, endpoint_ip, endpoint_username):
         isexist =  ESNPair.query.filter(ESNPair.storage_node_id == storage_node_id, ESNPair.endpoint_id == endpoint_id).first()
         if isexist != None:
@@ -789,6 +802,7 @@ class Zeroapi:
                 return _, -1, -1, None
             
     @staticmethod
+    #handles sftp responses, called within thread
     def handle_sftp_result(output, error_output, backup_exit_code):
        if backup_exit_code == 0 and not error_output:
            return backup_exit_code
@@ -797,6 +811,7 @@ class Zeroapi:
            return -1
        
     @staticmethod
+    #invoked by thread caller, initiates the backup operation
     def run_backup_thread(storage_client, endpoint_username, endpoint_ip,selected_storage_volumes, job_id, sch_id, backup_paths):
         with app.app_context():
             print("BACKUP PATHS ARE", backup_paths)
@@ -868,6 +883,7 @@ class Zeroapi:
 
 
     @staticmethod
+    #invoked by apscheduler when cron conditions are satisfied as dictated with configured scheduled job frequency
     def run_scheduled_backup(job_id, sch_id, selected_storage_volumes):
 
         with app.app_context():
@@ -893,6 +909,7 @@ class Zeroapi:
             endpoint_client.set_missing_host_key_policy(paramiko.RejectPolicy())
             endpoint_client.connect(hostname=endpoint_ip, username=endpoint_username, port=22, pkey=pkey)
             
+            #getting hash, last modified date and folder/file type before backup runs(will be used for configuration.json)
             command= f"$fileInfo = @{{}}; Get-ChildItem -Path \"{remote_folder}\" -Recurse | ForEach-Object {{ $itemPath = $_.FullName; $itemInfo = @{{'LastModified'=$_.LastWriteTime.ToString('M/d/yyyy HH:mm:ss')}}; if ($_.PSIsContainer) {{ $itemInfo['Type'] = 'Folder' }} else {{ $itemInfo['Type'] = 'File'; $hash = Get-FileHash -Path $_.FullName -Algorithm SHA1 | Select-Object -ExpandProperty Hash; $itemInfo['SHA1Hash'] = $hash }}; $fileInfo[$itemPath] = $itemInfo }}; $fileInfo | ConvertTo-Json"
             _, stdout, stderr = endpoint_client.exec_command(f'powershell.exe -ExecutionPolicy Bypass -Command "{command}"', timeout=60)
             output = stdout.read().decode('utf-8').strip()
@@ -905,6 +922,7 @@ class Zeroapi:
             modded_files=[]
             next_increment_config= {}
 
+            #handes the indentification of fullcopy/incremental copy labels
             if archive_queue != '[]' and archive_queue:
                 config_file_path= os.path.join("backend", "configurations", f"{job_name}_{schedule_created_date}_next_increment.json")
                 if os.path.exists( config_file_path):
@@ -918,7 +936,7 @@ class Zeroapi:
                             if metainfo.get('Type') == 'File':
                                 if metainfo.get('SHA1Hash') != stored_increment_content[path]['SHA1Hash']  or metainfo.get('LastModified') != stored_increment_content.get('LastModified'):
                                     next_increment_config[path] = metainfo
-                                    modded_files.append(path.replace("\\\\", "/"))
+                                    modded_files.append(path.replace("\\\\", "/")) #handles path nuances
                             elif metainfo.get('Type') == 'Folder':
                                 if metainfo['LastModified'] != stored_increment_content[path].get('LastModified'):
                                     modded_files.append(path.replace("\\\\", "/"))
@@ -957,7 +975,7 @@ class Zeroapi:
                 db.session.delete(fetched_schedule.existing_job)
                 db.session.commit() 
         
-    
+    #gets restore points based on satus of archive queue, returns in friendly format
     @app.route('/zeroapi/v1/backup/get_restore_points/<job_id>', methods=['GET'])
     def get_restore_points(job_id):
         user_token= request.headers['Authorization'].split(' ')[1]
@@ -972,13 +990,14 @@ class Zeroapi:
                 if fetched_schedule:
                     archive_queue_str = fetched_schedule.archive_queue
                     archive_queue = ast.literal_eval(archive_queue_str)
-                    restore_point_names=[]
-                    for arc in archive_queue:
-                        datetime_part = " ".join(arc.split("_")[1:])
+                    restore_point_labels={}
+                    for archive_label in archive_queue: 
+                        datetime_part = " ".join(archive_label.split("_")[1:])
                         datetime_object = datetime.strptime(datetime_part, '%Y-%m-%d %H-%M-%S')
                         restore_point_label = datetime_object.strftime('%Y-%m-%d %I:%M:%S%p')
-                        restore_point_names.append(restore_point_label)
-                    return jsonify({"response":  restore_point_names}),200
+                        restore_point_labels[archive_label] = restore_point_label
+                        #restore_point_labels.append({archive_label: restore_point_label})
+                    return jsonify(restore_point_labels),200
                 else:
                     return jsonify({"response":  []}),200
         except Exception as e:
@@ -986,8 +1005,8 @@ class Zeroapi:
             return jsonify({"response":  -1}),500
     
     
-    
-    @app.route('/zeroapi/v1/backup/restore', methods=['POST'])
+    #handles restoration, merging of full copies and increments
+    @app.route('/zeroapi/v1/restore', methods=['POST'])
     def restore():
         user_token= request.headers['Authorization'].split(' ')[1]
         if not user_token:
@@ -1000,6 +1019,55 @@ class Zeroapi:
                 data = request.get_json()
                 restore_point = data.get("restore_point")
                 job_id = data.get("job_id")
+                fetched_schedule = ScheduledJob.query.filter_by(job_id=job_id).first()
+                archive_str=''
+                if fetched_schedule:
+                    archive_queue_str = fetched_schedule.archive_queue
+                    archive_queue= ast.literal_eval(archive_queue_str)
+                    if restore_point in archive_queue:
+                        restore_point_index = archive_queue.index(restore_point)
+                        increment_list = archive_queue[:restore_point_index+1]
+                        zcryptobj= ZeroCryptor()
+                        #handles the transfer of each increments and merging with full copy
+                        for increment in increment_list:
+                            endpoint_user = fetched_schedule.existing_endpoint.username
+                            endpoint_ip_digest = fetched_schedule.existing_endpoint.ip
+                            endpoint_ip = zcryptobj._decrypt_data(encrypted_data= endpoint_ip_digest, type="ENDPOINT")
+
+                            storage_user = fetched_schedule.existing_job.esn_pair.storage_node.username
+                            storage_ip_digest= fetched_schedule.existing_job.esn_pair.storage_node.ip
+                            storage_ip = zcryptobj._decrypt_data(encrypted_data= storage_ip_digest, type="STORAGE")
+
+
+                            pkey = paramiko.RSAKey.from_private_key_file(app.config.get('Z_KEY_PATH'))
+                            storage_client = paramiko.SSHClient()
+                            storage_client.load_system_host_keys()
+                            storage_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                            storage_client.connect(hostname=storage_ip, username=storage_user, port=22, pkey=pkey)
+                            command =  f'sftp -oBatchMode=yes -C {endpoint_user}@{endpoint_ip}'
+                            stdin, stdout, stderr = storage_client.exec_command(command)
+                            #tbd handle the merging of increments on endpoint, the following only restore the full copy
+                            restore_commands = [f'put -r "D:/{restore_point}" "C:/Users/Administrator/" ','bye']
+                            for cmd in restore_commands:
+                                stdin.write(cmd + "\n")
+                                stdin.flush()
+                                time.sleep(0.5)  
+
+                            stdin.close()  
+                            stdin.write("bye\n")
+                            stdin.flush()
+                            stdin.close()
+                            error = stderr.read().decode().strip()
+                            output = stdout.read().decode().strip()
+                            sftp_exit_code = stdout.channel.recv_exit_status()
+
+
+
+
+
+
+
+
         except Exception as e:
             print(e)
             return jsonify({"response":  -1}),500
